@@ -26,7 +26,7 @@ export default async function AchievementsPage() {
     .order("name");
 
   const earnedIds = new Set(
-    (myAchievements ?? []).map((a) => a.achievement_id),
+    (myAchievements ?? []).map((a) => a.id),
   );
   const unearnedAchievements = (allAchievements ?? []).filter(
     (a) => !earnedIds.has(a.id),
