@@ -14,7 +14,7 @@ export default async function AchievementsPage() {
   const { data: myAchievements } = await supabase
     .from("member_achievements")
     .select(
-      "*, achievements(id, name, description, badge_colour, icon_url, trigger_type)",
+      "*, achievements(name, description, badge_colour, icon_url, trigger_type)",
     )
     .eq("member_id", user.id)
     .order("awarded_at", { ascending: false });
@@ -26,7 +26,7 @@ export default async function AchievementsPage() {
     .order("name");
 
   const earnedIds = new Set(
-    (myAchievements ?? []).map((a) => a.id),
+    (myAchievements ?? []).map((a) => a.achievements_id),
   );
   const unearnedAchievements = (allAchievements ?? []).filter(
     (a) => !earnedIds.has(a.id),
