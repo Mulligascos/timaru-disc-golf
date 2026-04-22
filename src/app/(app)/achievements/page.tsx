@@ -14,7 +14,7 @@ export default async function AchievementsPage() {
   const { data: myAchievements } = await supabase
     .from("member_achievements")
     .select(
-      "*, achievements(name, description, badge_colour, icon_url, trigger_type)",
+      "*, achievements(id, name, description, badge_colour, icon_url, trigger_type)",
     )
     .eq("member_id", user.id)
     .order("awarded_at", { ascending: false });
