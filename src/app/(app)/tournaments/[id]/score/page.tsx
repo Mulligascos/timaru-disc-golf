@@ -1,0 +1,126 @@
+import { createClient } from "@/lib/supabase/server";
+import { redirect, notFound } from "next/navigation";
+import { ScorecardEntry } from "@/components/tournaments/scorecard-entry";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = { title: "Scoring" };
+
+export default async function ScorePage({
+  params,
+}: {
+  params: { id: string };
+}) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const { data: tournament } = await supabase
+    .from("tournaments")
+    .select("*, courses(id, name)")
+    .eq("id", params.id)
+    .single();
+
+  if (!tournament || tournament.status !== "in_progress") notFound();
+
+  // Get current active round
+  const { data: rounds } = await supabase
+    .from("tournament_rounds")
+    .select("*")
+    .eq("tournament_id", params.id)
+    .eq("is_complete", false)
+    .order("round_number", { ascending: true })
+    .limit(1);
+
+  const currentRound = rounds?.[0];
+  if (!currentRound) {
+    return (
+      <div className="text-center py-16 bg-[#0d2818] min-h-screen flex flex-col items-center justify-center">
+        <p className="text-4xl mb-4">✅</p>
+        <p className="font-semibold text-white">All rounds complete!</p>
+      </div>
+    );
+  }
+
+  // Get holes
+  const courseId = currentRound.course_id ?? (tournament.courses as any)?.id;
+  const { data: holes } = await supabase
+    .from("holes")
+    .select("*")
+    .eq("course_id", courseId)
+    .order("hole_number", { ascending: true });
+
+  if (!holes || holes.length === 0) {
+    return (
+      <div className="text-center py-16 bg-[#0d2818] min-h-screen flex flex-col items-center justify-center">
+        <p className="text-4xl mb-4">⚠️</p>
+        <p className="font-semibold text-white">
+          No holes set up for this course.
+        </p>
+      </div>
+    );
+  }
+
+  // Get all registered players
+  const { data: registrations } = await supabase
+    .from("tournament_registrations")
+    .select("player_id, profiles(id, full_name, username)")
+    .eq("tournament_id", params.id);
+
+  if (!registrations || registrations.length === 0) {
+    return (
+      <div className="text-center py-16 bg-[#0d2818] min-h-screen flex flex-col items-center justify-center">
+        <p className="text-4xl mb-4">👥</p>
+        <p className="font-semibold text-white">No players registered.</p>
+      </div>
+    );
+  }
+
+  // Get or create scorecards for all players
+  const players = [];
+  for (const reg of registrations) {
+    const profile = reg.profiles as any;
+    if (!profile) continue;
+
+    let { data: scorecard } = await supabase
+      .from("scorecards")
+      .select("id, scores(throws, hole_id)")
+      .eq("round_id", currentRound.id)
+      .eq("player_id", reg.player_id)
+      .single();
+
+    if (!scorecard) {
+      const { data: newCard } = await supabase
+        .from("scorecards")
+        .insert({ round_id: currentRound.id, player_id: reg.player_id })
+        .select("id, scores(throws, hole_id)")
+        .single();
+      scorecard = newCard;
+    }
+
+    // Build existing scores map
+    const existingScores: Record<string, number> = {};
+    for (const s of scorecard?.scores ?? []) {
+      existingScores[s.hole_id] = s.throws;
+    }
+
+    players.push({
+      id: reg.player_id,
+      name: profile.full_name ?? profile.username ?? "Player",
+      scorecardId: scorecard?.id ?? "",
+      existingScores,
+    });
+  }
+
+  return (
+    <ScorecardEntry
+      players={players}
+      holes={holes}
+      tournamentId={params.id}
+      roundId={currentRound.id}
+      roundNumber={currentRound.round_number}
+      courseName={(tournament.courses as any)?.name ?? "Course"}
+    />
+  );
+}
