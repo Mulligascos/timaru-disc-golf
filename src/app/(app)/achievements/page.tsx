@@ -25,12 +25,12 @@ export default async function AchievementsPage() {
     .eq("is_active", true)
     .order("name");
 
-  const earnedIds = new Set(
-    (myAchievements ?? []).map((a) => a.achievement_id),
-  );
-  const unearnedAchievements = (allAchievements ?? []).filter(
-    (a) => !earnedIds.has(a.id),
-  );
+const earnedIds = new Set(
+  (myAchievements ?? []).map((a: any) => a.achievement_id),
+)
+const unearnedAchievements = (allAchievements ?? []).filter(
+  (a: any) => !earnedIds.has(a.id),
+)
 
   return (
     <div className="space-y-6">
