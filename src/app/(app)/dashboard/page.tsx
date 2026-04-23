@@ -14,6 +14,7 @@ import { StartCasualRound } from "@/components/rounds/start-casual-round";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = { title: "Dashboard" };
+export const revalidate = 30;
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -22,46 +23,50 @@ export default async function DashboardPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("*, bag_tags(tag_number)")
-    .eq("id", user.id)
-    .single();
-
-  const { data: announcements } = await supabase
-    .from("announcements")
-    .select("*")
-    .lte("published_at", new Date().toISOString())
-    .or("expires_at.is.null,expires_at.gt." + new Date().toISOString())
-    .order("is_pinned", { ascending: false })
-    .order("published_at", { ascending: false })
-    .limit(3);
-
-  const { data: tournaments } = await supabase
-    .from("tournaments")
-    .select("*, courses(name)")
-    .in("status", ["open", "in_progress"])
-    .order("start_date", { ascending: true })
-    .limit(3);
-
-  const { data: allMembers } = await supabase
-    .from("profiles")
-    .select("id, username, full_name")
-    .eq("is_active", true);
-
-  const { data: courses } = await supabase
-    .from("courses")
-    .select("id, name")
-    .eq("is_active", true);
-
-  // Recent casual rounds this user was in
-  const { data: recentRounds } = await supabase
-    .from("casual_rounds")
-    .select("id, played_on, is_complete, status, courses(name)")
-    .eq("created_by", user.id)
-    .neq("status", "cancelled")
-    .order("created_at", { ascending: false })
-    .limit(5);
+  // All queries in parallel
+  const [
+    { data: profile },
+    { data: announcements },
+    { data: tournaments },
+    { data: allMembers },
+    { data: courses },
+    { data: recentRounds },
+  ] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("*, bag_tags(tag_number)")
+      .eq("id", user.id)
+      .single(),
+    supabase
+      .from("announcements")
+      .select("*")
+      .lte("published_at", new Date().toISOString())
+      .or("expires_at.is.null,expires_at.gt." + new Date().toISOString())
+      .order("is_pinned", { ascending: false })
+      .order("published_at", { ascending: false })
+      .limit(3),
+    supabase
+      .from("tournaments")
+      .select("*, courses(name)")
+      .in("status", ["open", "in_progress"])
+      .order("start_date", { ascending: true })
+      .limit(3),
+    supabase
+      .from("profiles")
+      .select("id, username, full_name")
+      .eq("is_active", true),
+    supabase
+      .from("courses")
+      .select("id, name, hole_count")
+      .eq("is_active", true),
+    supabase
+      .from("casual_rounds")
+      .select("id, played_on, is_complete, status, courses(name)")
+      .eq("created_by", user.id)
+      .neq("status", "cancelled")
+      .order("created_at", { ascending: false })
+      .limit(5),
+  ]);
 
   const quickLinks = [
     {
@@ -104,7 +109,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      {/* Hero greeting */}
+      {/* Hero */}
       <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl p-6 text-white">
         <p className="text-green-400 text-sm font-medium">Welcome back</p>
         <h1 className="text-2xl font-bold mt-1">{firstName} 👋</h1>
@@ -128,11 +133,10 @@ export default async function DashboardPage() {
               <span className="text-gray-300">Claim a bag tag →</span>
             </Link>
           )}
-          {/* Start Round button right in the hero */}
           <StartCasualRound
             userId={user.id}
-            members={allMembers ?? []}
-            courses={courses ?? []}
+            members={(allMembers as any[]) ?? []}
+            courses={(courses as any[]) ?? []}
           />
         </div>
       </div>
@@ -162,8 +166,8 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      {/* Recent casual rounds */}
-      {recentRounds && recentRounds.length > 0 && (
+      {/* Recent rounds */}
+      {recentRounds && (recentRounds as any[]).length > 0 && (
         <div>
           <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
             Recent Rounds
@@ -176,9 +180,7 @@ export default async function DashboardPage() {
                 className="flex items-center gap-3 bg-white rounded-xl border border-gray-200 p-4 hover:border-gray-300 transition-colors"
               >
                 <div
-                  className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                    round.is_complete ? "bg-green-100" : "bg-yellow-100"
-                  }`}
+                  className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${round.is_complete ? "bg-green-100" : "bg-yellow-100"}`}
                 >
                   <Trophy
                     size={20}
@@ -189,7 +191,7 @@ export default async function DashboardPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-gray-900 text-sm">
-                    {(round as any).courses?.name ?? "Casual Round"}
+                    {round.courses?.name ?? "Casual Round"}
                   </p>
                   <p className="text-xs text-gray-500 mt-0.5">
                     {new Date(round.played_on).toLocaleDateString("en-NZ", {
@@ -199,11 +201,7 @@ export default async function DashboardPage() {
                   </p>
                 </div>
                 <span
-                  className={`text-xs px-2 py-1 rounded-full font-medium flex-shrink-0 ${
-                    round.is_complete
-                      ? "bg-green-100 text-green-700"
-                      : "bg-yellow-100 text-yellow-700"
-                  }`}
+                  className={`text-xs px-2 py-1 rounded-full font-medium flex-shrink-0 ${round.is_complete ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}
                 >
                   {round.is_complete ? "Complete" : "In progress"}
                 </span>
@@ -218,7 +216,7 @@ export default async function DashboardPage() {
       )}
 
       {/* Announcements */}
-      {announcements && announcements.length > 0 && (
+      {announcements && (announcements as any[]).length > 0 && (
         <div>
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
@@ -255,7 +253,7 @@ export default async function DashboardPage() {
       )}
 
       {/* Active tournaments */}
-      {tournaments && tournaments.length > 0 && (
+      {tournaments && (tournaments as any[]).length > 0 && (
         <div>
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
@@ -271,8 +269,8 @@ export default async function DashboardPage() {
           <div className="space-y-2">
             {(tournaments as any[]).map((t: any) => (
               <Link
-                key={(t as any).id}
-                href={`/tournaments/${(t as any).id}`}
+                key={t.id}
+                href={`/tournaments/${t.id}`}
                 className="flex items-center gap-4 bg-white rounded-xl border border-gray-200 p-4 hover:border-gray-300 transition-colors"
               >
                 <div
@@ -296,8 +294,7 @@ export default async function DashboardPage() {
                       day: "numeric",
                       month: "short",
                     })}
-                    {(t as any).courses?.name &&
-                      ` · ${(t as any).courses.name}`}
+                    {t.courses?.name && ` · ${t.courses.name}`}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">

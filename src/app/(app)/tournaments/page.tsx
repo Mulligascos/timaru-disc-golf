@@ -12,6 +12,7 @@ import {
 import type { Metadata } from "next";
 
 export const metadata: Metadata = { title: "Tournaments" };
+export const revalidate = 30;
 
 const statusColour: Record<string, string> = {
   draft: "bg-gray-100 text-gray-600",
@@ -20,7 +21,6 @@ const statusColour: Record<string, string> = {
   completed: "bg-purple-100 text-purple-700",
   cancelled: "bg-red-100 text-red-600",
 };
-
 const statusLabel: Record<string, string> = {
   draft: "Draft",
   open: "Open",
@@ -28,7 +28,6 @@ const statusLabel: Record<string, string> = {
   completed: "Completed",
   cancelled: "Cancelled",
 };
-
 const formatLabel: Record<string, string> = {
   stroke_play: "Stroke Play",
   match_play: "Match Play",
@@ -42,30 +41,29 @@ export default async function TournamentsPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
+  const [{ data: profile }, { data: tournaments }] = await Promise.all([
+    supabase.from("profiles").select("role").eq("id", user.id).single(),
+    supabase
+      .from("tournaments")
+      .select("*, courses(name)")
+      .neq("status", "cancelled")
+      .order("start_date", { ascending: false }),
+  ]);
+
   const isAdmin = (profile as any)?.role === "admin";
-
-  const { data: tournaments } = await supabase
-    .from("tournaments")
-    .select(`*, courses(name), tournament_registrations(count)`)
-    .neq("status", "cancelled")
-    .order("start_date", { ascending: false });
-
   const active =
     (tournaments as any[])?.filter((t: any) =>
       ["open", "in_progress"].includes(t.status),
     ) ?? [];
-  const past = tournaments?.filter((t: any) => t.status === "completed") ?? [];
-  const drafts = tournaments?.filter((t: any) => t.status === "draft") ?? [];
+  const past =
+    (tournaments as any[])?.filter((t: any) => t.status === "completed") ?? [];
+  const drafts =
+    (tournaments as any[])?.filter((t: any) => t.status === "draft") ?? [];
 
   function TournamentCard({ t }: { t: any }) {
     return (
       <Link
-        href={`/tournaments/${(t as any).id}`}
+        href={`/tournaments/${t.id}`}
         className="flex items-center gap-4 bg-white rounded-xl border border-gray-200 p-4 hover:border-gray-300 active:scale-[0.98] transition-all"
       >
         <div
@@ -148,8 +146,8 @@ export default async function TournamentsPage() {
             Active & Open
           </h2>
           <div className="space-y-2">
-            {active.map((t) => (
-              <TournamentCard key={(t as any).id} t={t} />
+            {active.map((t: any) => (
+              <TournamentCard key={t.id} t={t} />
             ))}
           </div>
         </section>
@@ -161,8 +159,8 @@ export default async function TournamentsPage() {
             Drafts
           </h2>
           <div className="space-y-2">
-            {drafts.map((t) => (
-              <TournamentCard key={(t as any).id} t={t} />
+            {drafts.map((t: any) => (
+              <TournamentCard key={t.id} t={t} />
             ))}
           </div>
         </section>
@@ -174,14 +172,14 @@ export default async function TournamentsPage() {
             Past Events
           </h2>
           <div className="space-y-2">
-            {past.map((t) => (
-              <TournamentCard key={(t as any).id} t={t} />
+            {past.map((t: any) => (
+              <TournamentCard key={t.id} t={t} />
             ))}
           </div>
         </section>
       )}
 
-      {(!tournaments || tournaments.length === 0) && (
+      {(!tournaments || (tournaments as any[]).length === 0) && (
         <div className="text-center py-16">
           <Trophy size={48} className="mx-auto text-gray-300 mb-4" />
           <p className="font-semibold text-gray-600">No tournaments yet</p>
