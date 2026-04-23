@@ -19,16 +19,17 @@ export default async function AdminBagTagsPage() {
     .select("role")
     .eq("id", user.id)
     .single();
-  if (profile?.role !== "admin") redirect("/dashboard");
+  if ((profile as any)?.role !== "admin") redirect("/bag-tags");
 
   const { data: tags } = await supabase
     .from("bag_tags")
     .select("*, profiles(full_name, username)")
     .order("tag_number", { ascending: true });
 
-  const claimed = tags?.filter((t) => t.holder_id) ?? [];
-  const unclaimed = tags?.filter((t) => !t.holder_id) ?? [];
-  const maxTag = tags?.reduce((max, t) => Math.max(max, t.tag_number), 0) ?? 0;
+  const claimed = tags?.filter((t) => (t as any).holder_id) ?? [];
+  const unclaimed = tags?.filter((t) => !(t as any).holder_id) ?? [];
+  const maxTag =
+    tags?.reduce((max, t) => Math.max(max, (t as any).tag_number), 0) ?? 0;
 
   return (
     <div className="space-y-6">
@@ -59,18 +60,21 @@ export default async function AdminBagTagsPage() {
         </div>
         <div className="divide-y divide-gray-100">
           {tags?.map((tag) => (
-            <div key={tag.id} className="flex items-center gap-3 px-4 py-3">
+            <div
+              key={(tag as any).id}
+              className="flex items-center gap-3 px-4 py-3"
+            >
               <div
                 className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm flex-shrink-0 ${
-                  tag.holder_id
+                  (tag as any).holder_id
                     ? "bg-green-100 text-green-700"
                     : "bg-gray-100 text-gray-400"
                 }`}
               >
-                #{tag.tag_number}
+                #{(tag as any).tag_number}
               </div>
               <div className="flex-1 min-w-0">
-                {tag.holder_id ? (
+                {(tag as any).holder_id ? (
                   <p className="text-sm font-semibold text-gray-900 truncate">
                     {(tag as any).profiles?.full_name ??
                       (tag as any).profiles?.username ??
@@ -80,7 +84,9 @@ export default async function AdminBagTagsPage() {
                   <p className="text-sm text-gray-400 italic">Unclaimed</p>
                 )}
               </div>
-              {tag.holder_id && <ReleaseTagForm tagId={tag.id} />}
+              {(tag as any).holder_id && (
+                <ReleaseTagForm tagId={(tag as any).id} />
+              )}
             </div>
           ))}
         </div>
@@ -101,13 +107,13 @@ function ReleaseTagForm({ tagId }: { tagId: string }) {
           .select("holder_id")
           .eq("id", tagId)
           .single();
-        if (tag?.holder_id) {
-          await supabase
+        if ((tag as any)?.holder_id) {
+          await (supabase as any)
             .from("profiles")
             .update({ current_tag_id: null })
-            .eq("id", tag.holder_id);
+            .eq("id", (tag as any)?.holder_id ?? "");
         }
-        await supabase
+        await (supabase as any)
           .from("bag_tags")
           .update({ holder_id: null })
           .eq("id", tagId);

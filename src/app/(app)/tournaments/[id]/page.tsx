@@ -47,15 +47,17 @@ export default async function TournamentDetailPage({
     .select("role")
     .eq("id", user.id)
     .single();
-  const isAdmin = profile?.role === "admin";
+  const isAdmin = (profile as any)?.role === "admin";
 
   const { data: tournament } = await supabase
     .from("tournaments")
-    .select(`*, courses(id, name, city)`)
+    .select("*, courses(id, name, city)")
     .eq("id", id)
     .single();
 
   if (!tournament) notFound();
+
+  const t = tournament as any;
 
   const { data: registrations } = await supabase
     .from("tournament_registrations")
@@ -70,28 +72,27 @@ export default async function TournamentDetailPage({
     .order("round_number", { ascending: true });
 
   const isRegistered =
-    registrations?.some((r) => r.player_id === user.id) ?? false;
-  const canRegister = tournament.status === "open";
-  const canScore = tournament.status === "in_progress" && isRegistered;
+    (registrations as any[])?.some((r: any) => r.player_id === user.id) ??
+    false;
+  const canRegister = t.status === "open";
+  const canScore = t.status === "in_progress" && isRegistered;
 
-  // Get scorecards for leaderboard if in progress or completed
   let scorecards: any[] = [];
   if (
-    ["in_progress", "completed"].includes(tournament.status) &&
+    ["in_progress", "completed"].includes(t.status) &&
     rounds &&
     rounds.length > 0
   ) {
-    const roundIds = rounds.map((r) => r.id);
+    const roundIds = (rounds as any[]).map((r: any) => r.id);
     const { data } = await supabase
       .from("scorecards")
       .select("*, profiles(id, username, full_name)")
       .in("round_id", roundIds);
-    scorecards = data ?? [];
+    scorecards = (data as any[]) ?? [];
   }
 
   return (
     <div className="space-y-6">
-      {/* Back */}
       <Link
         href="/tournaments"
         className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700"
@@ -99,25 +100,23 @@ export default async function TournamentDetailPage({
         <ChevronLeft size={16} /> Tournaments
       </Link>
 
-      {/* Header card */}
+      {/* Header */}
       <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl p-6 text-white">
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1 min-w-0">
             <span
-              className={`text-xs px-2.5 py-1 rounded-full font-semibold ${statusColour[tournament.status]}`}
+              className={`text-xs px-2.5 py-1 rounded-full font-semibold ${statusColour[t.status]}`}
             >
-              {statusLabel[tournament.status]}
+              {statusLabel[t.status]}
             </span>
-            <h1 className="text-xl font-bold mt-2">{tournament.name}</h1>
-            {tournament.description && (
-              <p className="text-gray-300 text-sm mt-1">
-                {tournament.description}
-              </p>
+            <h1 className="text-xl font-bold mt-2">{t.name}</h1>
+            {t.description && (
+              <p className="text-gray-300 text-sm mt-1">{t.description}</p>
             )}
           </div>
           {isAdmin && (
             <Link
-              href={`/tournaments/${tournament.id}/edit`}
+              href={`/tournaments/${t.id}/edit`}
               className="flex-shrink-0 p-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors"
             >
               <Edit size={16} />
@@ -130,7 +129,7 @@ export default async function TournamentDetailPage({
             <p className="text-gray-400 text-xs">Date</p>
             <p className="text-white text-sm font-semibold mt-0.5 flex items-center gap-1">
               <Calendar size={13} />
-              {new Date(tournament.start_date).toLocaleDateString("en-NZ", {
+              {new Date(t.start_date).toLocaleDateString("en-NZ", {
                 day: "numeric",
                 month: "short",
                 year: "numeric",
@@ -140,14 +139,14 @@ export default async function TournamentDetailPage({
           <div className="bg-white/10 rounded-xl p-3">
             <p className="text-gray-400 text-xs">Format</p>
             <p className="text-white text-sm font-semibold mt-0.5 capitalize">
-              {tournament.format.replace("_", " ")}
+              {t.format?.replace("_", " ")}
             </p>
           </div>
-          {(tournament.courses as any)?.name && (
+          {t.courses?.name && (
             <div className="bg-white/10 rounded-xl p-3">
               <p className="text-gray-400 text-xs">Course</p>
               <p className="text-white text-sm font-semibold mt-0.5 flex items-center gap-1">
-                <MapPin size={13} /> {(tournament.courses as any).name}
+                <MapPin size={13} /> {t.courses.name}
               </p>
             </div>
           )}
@@ -155,8 +154,8 @@ export default async function TournamentDetailPage({
             <p className="text-gray-400 text-xs">Players</p>
             <p className="text-white text-sm font-semibold mt-0.5 flex items-center gap-1">
               <Users size={13} />
-              {registrations?.length ?? 0}
-              {tournament.max_players ? ` / ${tournament.max_players}` : ""}
+              {(registrations as any[])?.length ?? 0}
+              {t.max_players ? ` / ${t.max_players}` : ""}
             </p>
           </div>
         </div>
@@ -166,14 +165,14 @@ export default async function TournamentDetailPage({
       <div className="flex gap-3">
         {canRegister && (
           <RegisterButton
-            tournamentId={tournament.id}
+            tournamentId={t.id}
             userId={user.id}
             isRegistered={isRegistered}
           />
         )}
-        {canScore && rounds && rounds.length > 0 && (
+        {canScore && rounds && (rounds as any[]).length > 0 && (
           <Link
-            href={`/tournaments/${tournament.id}/score`}
+            href={`/tournaments/${t.id}/score`}
             className="flex-1 flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded-xl transition-colors"
           >
             <Trophy size={18} /> Enter Scores
@@ -182,21 +181,21 @@ export default async function TournamentDetailPage({
       </div>
 
       {/* Leaderboard */}
-      {["in_progress", "completed"].includes(tournament.status) &&
+      {["in_progress", "completed"].includes(t.status) &&
         scorecards.length > 0 && (
           <Leaderboard
             scorecards={scorecards}
-            rounds={rounds ?? []}
-            format={tournament.format}
+            rounds={(rounds as any[]) ?? []}
+            format={t.format}
           />
         )}
 
-      {/* Rounds */}
-      {isAdmin && rounds && rounds.length > 0 && (
+      {/* Rounds — admin only */}
+      {isAdmin && rounds && (rounds as any[]).length > 0 && (
         <section>
           <h2 className="text-sm font-semibold text-gray-900 mb-3">Rounds</h2>
           <div className="space-y-2">
-            {rounds.map((r) => (
+            {(rounds as any[]).map((r: any) => (
               <div
                 key={r.id}
                 className="bg-white rounded-xl border border-gray-200 p-4 flex items-center justify-between"
@@ -212,12 +211,15 @@ export default async function TournamentDetailPage({
                           month: "short",
                         })
                       : "Date TBC"}
-                    {(r as any).courses?.name &&
-                      ` · ${(r as any).courses.name}`}
+                    {r.courses?.name && ` · ${r.courses.name}`}
                   </p>
                 </div>
                 <span
-                  className={`text-xs px-2 py-1 rounded-full font-medium ${r.is_complete ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}
+                  className={`text-xs px-2 py-1 rounded-full font-medium ${
+                    r.is_complete
+                      ? "bg-green-100 text-green-700"
+                      : "bg-yellow-100 text-yellow-700"
+                  }`}
                 >
                   {r.is_complete ? "Complete" : "In Progress"}
                 </span>
@@ -228,22 +230,21 @@ export default async function TournamentDetailPage({
       )}
 
       {/* Players */}
-      {registrations && registrations.length > 0 && (
+      {registrations && (registrations as any[]).length > 0 && (
         <section>
           <h2 className="text-sm font-semibold text-gray-900 mb-3">
-            Registered Players ({registrations.length})
+            Registered Players ({(registrations as any[]).length})
           </h2>
           <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-100">
-            {registrations.map((r, i) => (
+            {(registrations as any[]).map((r: any) => (
               <div key={r.id} className="flex items-center gap-3 p-3">
                 <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                  {(r.profiles as any)?.full_name?.charAt(0)?.toUpperCase() ??
-                    (r.profiles as any)?.username?.charAt(0)?.toUpperCase() ??
+                  {r.profiles?.full_name?.charAt(0)?.toUpperCase() ??
+                    r.profiles?.username?.charAt(0)?.toUpperCase() ??
                     "?"}
                 </div>
                 <p className="text-sm font-medium text-gray-900">
-                  {(r.profiles as any)?.full_name ??
-                    (r.profiles as any)?.username}
+                  {r.profiles?.full_name ?? r.profiles?.username}
                   {r.player_id === user.id && (
                     <span className="text-green-600 text-xs ml-1">(you)</span>
                   )}

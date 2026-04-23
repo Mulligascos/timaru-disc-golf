@@ -6,8 +6,8 @@ interface TagLeaderboardProps {
 }
 
 export function TagLeaderboard({ tags, currentUserId }: TagLeaderboardProps) {
-  const claimed = tags.filter((t) => t.holder_id);
-  const unclaimed = tags.filter((t) => !t.holder_id);
+  const claimed = tags.filter((t) => (t as any).holder_id);
+  const unclaimed = tags.filter((t) => !(t as any).holder_id);
 
   if (tags.length === 0) {
     return (
@@ -36,14 +36,14 @@ export function TagLeaderboard({ tags, currentUserId }: TagLeaderboardProps) {
       <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
         <div className="divide-y divide-gray-100">
           {claimed.map((tag, i) => {
-            const isMe = tag.holder_id === currentUserId;
+            const isMe = (tag as any).holder_id === currentUserId;
             const name =
               tag.profiles?.full_name ?? tag.profiles?.username ?? "Unknown";
             const initials = name.charAt(0).toUpperCase();
 
             return (
               <div
-                key={tag.id}
+                key={(tag as any).id}
                 className={`flex items-center gap-3 px-4 py-3 ${isMe ? "bg-green-50" : ""}`}
               >
                 {/* Position */}
@@ -69,7 +69,7 @@ export function TagLeaderboard({ tags, currentUserId }: TagLeaderboardProps) {
                             : "bg-gray-100 text-gray-600"
                   }`}
                 >
-                  #{tag.tag_number}
+                  #{(tag as any).tag_number}
                 </div>
 
                 {/* Avatar + name */}
@@ -103,7 +103,7 @@ export function TagLeaderboard({ tags, currentUserId }: TagLeaderboardProps) {
           <div className="border-t border-gray-100 px-4 py-3 bg-gray-50">
             <p className="text-xs text-gray-400 font-medium">
               {unclaimed.length} unclaimed tag{unclaimed.length > 1 ? "s" : ""}:{" "}
-              {unclaimed.map((t) => `#${t.tag_number}`).join(", ")}
+              {unclaimed.map((t) => `#${(t as any).tag_number}`).join(", ")}
             </p>
           </div>
         )}

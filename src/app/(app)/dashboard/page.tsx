@@ -98,7 +98,9 @@ export default async function DashboardPage() {
   ];
 
   const firstName =
-    profile?.full_name?.split(" ")[0] ?? profile?.username ?? "there";
+    (profile as any)?.full_name?.split(" ")[0] ??
+    (profile as any)?.username ??
+    "there";
 
   return (
     <div className="space-y-6">
@@ -167,7 +169,7 @@ export default async function DashboardPage() {
             Recent Rounds
           </h2>
           <div className="space-y-2">
-            {recentRounds.map((round) => (
+            {(recentRounds as any[]).map((round: any) => (
               <Link
                 key={round.id}
                 href={`/rounds/${round.id}`}
@@ -230,7 +232,7 @@ export default async function DashboardPage() {
             </Link>
           </div>
           <div className="space-y-2">
-            {announcements.map((a) => (
+            {(announcements as any[]).map((a: any) => (
               <div
                 key={a.id}
                 className={`bg-white rounded-xl border p-4 ${a.is_pinned ? "border-green-300" : "border-gray-200"}`}
@@ -267,10 +269,10 @@ export default async function DashboardPage() {
             </Link>
           </div>
           <div className="space-y-2">
-            {tournaments.map((t) => (
+            {(tournaments as any[]).map((t: any) => (
               <Link
-                key={t.id}
-                href={`/tournaments/${t.id}`}
+                key={(t as any).id}
+                href={`/tournaments/${(t as any).id}`}
                 className="flex items-center gap-4 bg-white rounded-xl border border-gray-200 p-4 hover:border-gray-300 transition-colors"
               >
                 <div

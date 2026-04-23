@@ -62,7 +62,7 @@ export function useUser(): UseUserReturn {
   return {
     user,
     profile,
-    isAdmin: profile?.role === "admin",
+    isAdmin: (profile as any)?.role === "admin",
     loading,
   };
 }

@@ -31,7 +31,7 @@ export default async function HazardsPage() {
     .select("role")
     .eq("id", user.id)
     .single();
-  const isAdmin = profile?.role === "admin";
+  const isAdmin = (profile as any)?.role === "admin";
 
   const { data: courses } = await supabase
     .from("courses")
@@ -44,9 +44,13 @@ export default async function HazardsPage() {
     .order("created_at", { ascending: false });
 
   const open =
-    hazards?.filter((h) => ["open", "in_review"].includes(h.status)) ?? [];
+    (hazards as any[])?.filter((h: any) =>
+      ["open", "in_review"].includes(h.status),
+    ) ?? [];
   const resolved =
-    hazards?.filter((h) => ["resolved", "closed"].includes(h.status)) ?? [];
+    (hazards as any[])?.filter((h: any) =>
+      ["resolved", "closed"].includes(h.status),
+    ) ?? [];
 
   return (
     <div className="space-y-6">
@@ -183,7 +187,7 @@ function AdminHazardActions({
         "use server";
         const { createClient } = await import("@/lib/supabase/server");
         const supabase = await createClient();
-        await supabase
+        await (supabase as any)
           .from("hazard_reports")
           .update({
             status: next,

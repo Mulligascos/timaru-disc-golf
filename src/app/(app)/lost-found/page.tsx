@@ -135,7 +135,7 @@ export default async function LostFoundPage() {
             <ContactButton disc={disc} reportedBy={disc.profiles} />
           </div>
         )}
-        {type === "lost" && profile?.role === "admin" && (
+        {type === "lost" && (profile as any)?.role === "admin" && (
           <div className="border-t border-gray-100 px-4 py-2.5">
             <MarkReunitedButton discId={disc.id} type="lost" />
           </div>

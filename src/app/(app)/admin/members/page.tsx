@@ -19,7 +19,7 @@ export default async function AdminMembersPage() {
     .select("role")
     .eq("id", user.id)
     .single();
-  if (profile?.role !== "admin") redirect("/dashboard");
+  if ((profile as any)?.role !== "admin") redirect("/dashboard");
 
   const { data: members } = await supabase
     .from("profiles")
@@ -41,7 +41,7 @@ export default async function AdminMembersPage() {
       </div>
 
       <div className="bg-white rounded-2xl border border-gray-200 divide-y divide-gray-100">
-        {members?.map((m) => (
+        {(members as any[])?.map((m: any) => (
           <div key={m.id} className="flex items-center gap-3 p-4">
             <div
               className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0 ${

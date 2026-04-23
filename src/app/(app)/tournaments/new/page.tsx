@@ -17,7 +17,7 @@ export default async function NewTournamentPage() {
     .select("role")
     .eq("id", user.id)
     .single();
-  if (profile?.role !== "admin") redirect("/tournaments");
+  if ((profile as any)?.role !== "admin") redirect("/tournaments");
 
   const { data: courses } = await supabase
     .from("courses")
@@ -31,7 +31,7 @@ export default async function NewTournamentPage() {
         <h1 className="text-2xl font-bold text-gray-900">New Tournament</h1>
         <p className="text-gray-500 text-sm mt-1">Set up a new club event</p>
       </div>
-      <TournamentForm courses={courses ?? []} />
+      <TournamentForm courses={(courses as any[]) ?? []} />
     </div>
   );
 }

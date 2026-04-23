@@ -41,7 +41,7 @@ export function ClaimTag({ unclaimedTags, userId }: ClaimTagProps) {
       .eq("id", userId);
 
     // Record history
-    const tag = unclaimedTags.find((t) => t.id === selectedTag);
+    const tag = unclaimedTags.find((t) => (t as any).id === selectedTag);
     await supabase.from("tag_history").insert({
       tag_id: selectedTag,
       from_holder_id: null,
@@ -82,15 +82,15 @@ export function ClaimTag({ unclaimedTags, userId }: ClaimTagProps) {
       <div className="flex flex-wrap gap-2 mb-4">
         {unclaimedTags.map((tag) => (
           <button
-            key={tag.id}
-            onClick={() => setSelectedTag(tag.id)}
+            key={(tag as any).id}
+            onClick={() => setSelectedTag((tag as any).id)}
             className={`w-12 h-12 rounded-xl font-bold text-sm transition-all active:scale-95 ${
-              selectedTag === tag.id
+              selectedTag === (tag as any).id
                 ? "bg-green-500 text-white ring-2 ring-green-300"
                 : "bg-gray-100 text-gray-700 hover:bg-gray-200"
             }`}
           >
-            #{tag.tag_number}
+            #{(tag as any).tag_number}
           </button>
         ))}
       </div>
@@ -105,7 +105,7 @@ export function ClaimTag({ unclaimedTags, userId }: ClaimTagProps) {
         {claiming
           ? "Claiming..."
           : selectedTag
-            ? `Claim Tag #${unclaimedTags.find((t) => t.id === selectedTag)?.tag_number}`
+            ? `Claim Tag #${unclaimedTags.find((t) => (t as any).id === selectedTag)?.tag_number}`
             : "Select a tag first"}
       </button>
     </div>

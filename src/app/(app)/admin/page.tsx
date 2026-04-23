@@ -30,7 +30,7 @@ export default async function AdminPage() {
     .select("role")
     .eq("id", user.id)
     .single();
-  if (profile?.role !== "admin") redirect("/dashboard");
+  if ((profile as any)?.role !== "admin") redirect("/dashboard");
 
   // Fetch counts for dashboard stats
   const [

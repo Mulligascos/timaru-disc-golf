@@ -57,7 +57,7 @@ export default async function AppLayout({
     .eq("id", user.id)
     .single();
 
-  const isAdmin = profile?.role === "admin";
+  const isAdmin = (profile as any)?.role === "admin";
 
   async function signOut() {
     "use server";
@@ -118,8 +118,8 @@ export default async function AppLayout({
               className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-800 transition-colors"
             >
               <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                {profile?.full_name?.charAt(0)?.toUpperCase() ??
-                  profile?.username?.charAt(0)?.toUpperCase() ??
+                {(profile as any)?.full_name?.charAt(0)?.toUpperCase() ??
+                  (profile as any)?.username?.charAt(0)?.toUpperCase() ??
                   "U"}
               </div>
               <div className="min-w-0">
@@ -155,8 +155,8 @@ export default async function AppLayout({
           )}
           <Link href="/profile">
             <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center text-white text-xs font-bold">
-              {profile?.full_name?.charAt(0)?.toUpperCase() ??
-                profile?.username?.charAt(0)?.toUpperCase() ??
+              {(profile as any)?.full_name?.charAt(0)?.toUpperCase() ??
+                (profile as any)?.username?.charAt(0)?.toUpperCase() ??
                 "U"}
             </div>
           </Link>

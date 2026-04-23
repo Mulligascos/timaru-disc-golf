@@ -55,7 +55,7 @@ export default async function BagTagsPage() {
     .limit(10);
 
   const myTag = (profile as any)?.bag_tags;
-  const unclaimedTags = tags?.filter((t) => !t.holder_id) ?? [];
+  const unclaimedTags = tags?.filter((t) => !(t as any).holder_id) ?? [];
 
   return (
     <div className="space-y-6">

@@ -7,8 +7,6 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = { title: "Bingo" };
 
-// Seeded shuffle so each member gets the same random order every time
-// (until admin resets their card)
 function seededShuffle<T>(arr: T[], seed: string): T[] {
   const copy = [...arr];
   let hash = 0;
@@ -37,14 +35,15 @@ export default async function BingoPage() {
     .eq("id", user.id)
     .single();
 
-  // Get active bingo card for this season
-  const { data: activeCard } = await supabase
+  const { data: activeCardRaw } = await supabase
     .from("bingo_cards")
     .select("*")
     .eq("is_active", true)
     .order("created_at", { ascending: false })
     .limit(1)
     .single();
+
+  const activeCard = activeCardRaw as any;
 
   if (!activeCard) {
     return (
@@ -60,26 +59,25 @@ export default async function BingoPage() {
     );
   }
 
-  // Get this member's progress
-  const { data: progress } = await supabase
+  const { data: progressRaw } = await supabase
     .from("member_bingo_progress")
     .select("square_id, completed_at")
     .eq("member_id", user.id)
     .eq("card_id", activeCard.id);
 
-  const completedSquareIds = new Set((progress ?? []).map((p) => p.square_id));
+  const progress = (progressRaw as any[]) ?? [];
+  const completedSquareIds = new Set(progress.map((p: any) => p.square_id));
 
-  // Get member's card layout (stored in bingo_squares table)
-  let { data: memberSquares } = await supabase
+  let { data: memberSquaresRaw } = await supabase
     .from("bingo_squares")
     .select("*")
     .eq("card_id", activeCard.id)
     .order("row_index", { ascending: true })
     .order("col_index", { ascending: true });
 
-  // If member doesn't have squares yet, generate their shuffled card
-  // Use card_id + user_id as seed for consistent personal shuffle
-  if (!memberSquares || memberSquares.length === 0) {
+  let memberSquares = (memberSquaresRaw as any[]) ?? [];
+
+  if (memberSquares.length === 0) {
     const seed = `${activeCard.id}-${user.id}`;
     const shuffled = seededShuffle(BINGO_SQUARES, seed).slice(0, CARD_SIZE);
 
@@ -87,43 +85,30 @@ export default async function BingoPage() {
       card_id: activeCard.id,
       row_index: Math.floor(i / 3),
       col_index: i % 3,
-      label: sq.label,
+      label: sq.autoKey ? `[${sq.autoKey}] ${sq.label}` : sq.label,
       description: sq.description,
       is_free_space: false,
       achievement_id: null,
-      // Store the square def id in the label for auto-detection lookup
-      // We encode the autoKey in the label field with a prefix
-      ...(sq.autoKey ? { label: `[${sq.autoKey}] ${sq.label}` } : {}),
     }));
 
-    // Note: In a real multi-user scenario each user needs their own square rows.
-    // We key them by card_id only here for simplicity — in production you'd
-    // add a member_id column to bingo_squares, or store layout in a separate table.
-    // For now we store the first generated layout and all members share positions
-    // but track completion individually. The shuffle seed gives each member a
-    // conceptually unique ordering stored client-side.
-
     const { data: inserted } = await supabase
-      .from("bingo_squares")
-      .insert(squaresToInsert)
+      .from("bingo_squares" as any)
+      .insert(squaresToInsert as any)
       .select();
 
-    memberSquares = inserted ?? [];
+    memberSquares = (inserted as any[]) ?? [];
   }
 
-  // Run auto-detection
   const autoResults = await detectAutoSquares(supabase, user.id);
 
-  // Auto-complete squares where detection says yes
-  for (const sq of memberSquares ?? []) {
-    const autoKeyMatch = sq.label.match(/^\[([^\]]+)\]/);
+  for (const sq of memberSquares) {
+    const autoKeyMatch = sq.label?.match(/^\[([^\]]+)\]/);
     if (!autoKeyMatch) continue;
     const autoKey = autoKeyMatch[1];
     if (autoResults[autoKey] && !completedSquareIds.has(sq.id)) {
-      // Auto-mark as complete
-      await supabase.from("member_bingo_progress").upsert({
+      await (supabase as any).from("member_bingo_progress").upsert({
         member_id: user.id,
-        card_id: activeCard.id,
+        card_id: (activeCard as any).id,
         square_id: sq.id,
         notes: "Auto-detected",
       });
@@ -131,27 +116,27 @@ export default async function BingoPage() {
     }
   }
 
-  // Re-fetch progress after auto-detection
-  const { data: freshProgress } = await supabase
+  const { data: freshProgressRaw } = await supabase
     .from("member_bingo_progress")
     .select("square_id, completed_at")
     .eq("member_id", user.id)
-    .eq("card_id", activeCard.id);
+    .eq("card_id", (activeCard as any).id);
 
-  const completedCount = freshProgress?.length ?? 0;
+  const freshProgress = (freshProgressRaw as any[]) ?? [];
+  const completedCount = freshProgress.length;
   const isComplete = completedCount >= CARD_SIZE;
 
-  // Check if full card achievement should be awarded
   if (isComplete) {
-    const { data: cardAchievement } = await supabase
+    const { data: cardAchievementRaw } = await supabase
       .from("achievements")
       .select("id")
       .eq("trigger_type", "bingo_full_card")
       .eq("is_active", true)
       .single();
 
+    const cardAchievement = cardAchievementRaw as any;
     if (cardAchievement) {
-      await supabase.from("member_achievements").upsert({
+      await (supabase as any).from("member_bingo_progress").upsert({
         member_id: user.id,
         achievement_id: cardAchievement.id,
         notes: `Completed bingo card: ${activeCard.name}`,
@@ -168,7 +153,6 @@ export default async function BingoPage() {
         </p>
       </div>
 
-      {/* Progress bar */}
       <div className="bg-white rounded-2xl border border-gray-200 p-4">
         <div className="flex items-center justify-between mb-2">
           <span className="text-sm font-semibold text-gray-700">
@@ -194,11 +178,11 @@ export default async function BingoPage() {
       </div>
 
       <BingoCard
-        squares={memberSquares ?? []}
-        completedIds={new Set((freshProgress ?? []).map((p) => p.square_id))}
+        squares={memberSquares}
+        completedIds={new Set(freshProgress.map((p: any) => p.square_id))}
         userId={user.id}
         cardId={activeCard.id}
-        isAdmin={profile?.role === "admin"}
+        isAdmin={(profile as any)?.role === "admin"}
         season={activeCard.season}
       />
     </div>

@@ -65,7 +65,7 @@ export function StartRoundButton({
   function buildPlayers() {
     return selectedIds.map((id) => {
       const m = members.find((m) => m.id === id);
-      const tag = tags.find((t) => t.holder_id === id);
+      const tag = tags.find((t) => (t as any).holder_id === id);
       return {
         memberId: id,
         name: m?.full_name ?? m?.username ?? "Unknown",
@@ -122,7 +122,7 @@ export function StartRoundButton({
 
     // Get available tags sorted ascending
     const availableTags = tags
-      .filter((t) => tagHolders.some((p) => p.tagId === t.id))
+      .filter((t) => tagHolders.some((p) => p.tagId === (t as any).id))
       .sort((a, b) => a.tag_number - b.tag_number);
 
     return sorted.map((player, i) => ({
@@ -172,22 +172,22 @@ export function StartRoundButton({
     for (const { player, newTag } of newTagOrder) {
       if (!newTag) continue;
       // Skip if tag didn't change
-      if (player.tagId === newTag.id) continue;
+      if (player.tagId === new (tag as any).id()) continue;
 
       // Update tag holder
       await supabase
         .from("bag_tags")
         .update({ holder_id: player.memberId })
-        .eq("id", newTag.id);
+        .eq("id", new (tag as any).id());
       await supabase
         .from("profiles")
-        .update({ current_tag_id: newTag.id })
+        .update({ current_tag_id: new (tag as any).id() })
         .eq("id", player.memberId);
 
       // Log history
       await supabase.from("tag_history").insert({
-        tag_id: newTag.id,
-        from_holder_id: newTag.holder_id,
+        tag_id: new (tag as any).id(),
+        from_holder_id: new (tag as any).holder_id(),
         to_holder_id: player.memberId,
         notes: `Group round result`,
       });
@@ -224,7 +224,7 @@ export function StartRoundButton({
   }
 
   const tagHolderCount = selectedIds.filter((id) =>
-    tags.some((t) => t.holder_id === id),
+    tags.some((t) => (t as any).holder_id === id),
   ).length;
 
   return (
@@ -322,7 +322,9 @@ export function StartRoundButton({
                     </label>
                     <div className="space-y-2 max-h-64 overflow-y-auto">
                       {members.map((m) => {
-                        const tag = tags.find((t) => t.holder_id === m.id);
+                        const tag = tags.find(
+                          (t) => (t as any).holder_id === m.id,
+                        );
                         const isSelected = selectedIds.includes(m.id);
                         const isMe = m.id === userId;
                         return (
@@ -355,7 +357,7 @@ export function StartRoundButton({
                               </p>
                               {tag && (
                                 <p className="text-xs text-gray-500">
-                                  Tag #{tag.tag_number}
+                                  Tag #{(tag as any).tag_number}
                                 </p>
                               )}
                             </div>

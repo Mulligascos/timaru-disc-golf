@@ -20,7 +20,7 @@ export default async function AdminCoursesPage() {
     .select("role")
     .eq("id", user.id)
     .single();
-  if (profile?.role !== "admin") redirect("/dashboard");
+  if ((profile as any)?.role !== "admin") redirect("/dashboard");
 
   const { data: courses } = await supabase
     .from("courses")
@@ -48,7 +48,7 @@ export default async function AdminCoursesPage() {
       </div>
 
       {/* Existing courses */}
-      {courses?.map((course) => (
+      {(courses as any[])?.map((course: any) => (
         <div
           key={course.id}
           className="bg-white rounded-2xl border border-gray-200 overflow-hidden"

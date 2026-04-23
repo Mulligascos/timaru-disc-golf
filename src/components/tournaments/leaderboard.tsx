@@ -69,8 +69,8 @@ export function Leaderboard({ scorecards, rounds, format }: LeaderboardProps) {
               </div>
               <div className="flex items-center gap-2 py-3 px-2">
                 <div className="w-7 h-7 rounded-full bg-green-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                  {entry.profile?.full_name?.charAt(0)?.toUpperCase() ??
-                    entry.profile?.username?.charAt(0)?.toUpperCase() ??
+                  {entry.(profile as any)?.full_name?.charAt(0)?.toUpperCase() ??
+                    entry.(profile as any)?.username?.charAt(0)?.toUpperCase() ??
                     "?"}
                 </div>
                 <span

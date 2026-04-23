@@ -26,7 +26,7 @@ export default async function ImprovementsPage() {
     .select("role")
     .eq("id", user.id)
     .single();
-  const isAdmin = profile?.role === "admin";
+  const isAdmin = (profile as any)?.role === "admin";
 
   const { data: courses } = await supabase
     .from("courses")
@@ -55,7 +55,7 @@ export default async function ImprovementsPage() {
 
       {requests && requests.length > 0 ? (
         <div className="space-y-3">
-          {requests.map((r) => {
+          {(requests as any[]).map((r: any) => {
             const sta = statusConfig[r.status] ?? statusConfig.open;
             const hasUpvoted = (r.improvement_upvotes ?? []).some(
               (u: any) => u.member_id === user.id,
@@ -166,7 +166,7 @@ function AdminImprovementActions({
         "use server";
         const { createClient } = await import("@/lib/supabase/server");
         const supabase = await createClient();
-        await supabase
+        await (supabase as any)
           .from("improvement_requests")
           .update({
             status: next,

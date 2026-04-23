@@ -47,7 +47,7 @@ export default async function TournamentsPage() {
     .select("role")
     .eq("id", user.id)
     .single();
-  const isAdmin = profile?.role === "admin";
+  const isAdmin = (profile as any)?.role === "admin";
 
   const { data: tournaments } = await supabase
     .from("tournaments")
@@ -64,7 +64,7 @@ export default async function TournamentsPage() {
   function TournamentCard({ t }: { t: any }) {
     return (
       <Link
-        href={`/tournaments/${t.id}`}
+        href={`/tournaments/${(t as any).id}`}
         className="flex items-center gap-4 bg-white rounded-xl border border-gray-200 p-4 hover:border-gray-300 active:scale-[0.98] transition-all"
       >
         <div
@@ -148,7 +148,7 @@ export default async function TournamentsPage() {
           </h2>
           <div className="space-y-2">
             {active.map((t) => (
-              <TournamentCard key={t.id} t={t} />
+              <TournamentCard key={(t as any).id} t={t} />
             ))}
           </div>
         </section>
@@ -161,7 +161,7 @@ export default async function TournamentsPage() {
           </h2>
           <div className="space-y-2">
             {drafts.map((t) => (
-              <TournamentCard key={t.id} t={t} />
+              <TournamentCard key={(t as any).id} t={t} />
             ))}
           </div>
         </section>
@@ -174,7 +174,7 @@ export default async function TournamentsPage() {
           </h2>
           <div className="space-y-2">
             {past.map((t) => (
-              <TournamentCard key={t.id} t={t} />
+              <TournamentCard key={(t as any).id} t={t} />
             ))}
           </div>
         </section>

@@ -19,7 +19,7 @@ export default async function AnnouncementsPage() {
     .eq("id", user.id)
     .single();
 
-  const isAdmin = profile?.role === "admin";
+  const isAdmin = (profile as any)?.role === "admin";
 
   const { data: announcements } = await supabase
     .from("announcements")
@@ -114,7 +114,7 @@ export default async function AnnouncementsPage() {
             Drafts
           </h2>
           <div className="space-y-3">
-            {drafts.map((a) => (
+            {(drafts as any[]).map((a: any) => (
               <AnnouncementCard key={a.id} a={a} isDraft />
             ))}
           </div>
@@ -123,7 +123,7 @@ export default async function AnnouncementsPage() {
 
       {announcements && announcements.length > 0 ? (
         <div className="space-y-3">
-          {announcements.map((a) => (
+          {(announcements as any[]).map((a: any) => (
             <AnnouncementCard key={a.id} a={a} />
           ))}
         </div>
