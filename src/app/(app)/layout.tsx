@@ -124,7 +124,7 @@ export default async function AppLayout({
               </div>
               <div className="min-w-0">
                 <p className="text-white text-sm font-medium truncate">
-                  {profile?.full_name ?? profile?.username}
+                  {(profile as any)?.full_name ?? (profile as any)?.username}
                 </p>
                 {isAdmin && <p className="text-green-400 text-xs">Admin</p>}
               </div>
