@@ -26,10 +26,11 @@ export default async function AchievementsPage() {
     .order("name");
 
   const earnedIds = new Set(
-    (myAchievements ?? []).map((a) => a.achievement_id),
+    (myAchievements ?? []).map((a: any) => a.achievement_id),
   );
+
   const unearnedAchievements = (allAchievements ?? []).filter(
-    (a) => !earnedIds.has(a.id),
+    (a: any) => !earnedIds.has(a.id),
   );
 
   return (
@@ -49,7 +50,7 @@ export default async function AchievementsPage() {
             Earned
           </h2>
           <div className="grid grid-cols-1 gap-3">
-            {myAchievements.map((ma) => (
+            {(myAchievements as any[]).map((ma: any) => (
               <div
                 key={ma.id}
                 className="flex items-center gap-4 bg-white rounded-xl border border-gray-200 p-4"
@@ -102,7 +103,7 @@ export default async function AchievementsPage() {
             Still to earn
           </h2>
           <div className="grid grid-cols-1 gap-3">
-            {unearnedAchievements.map((a) => (
+            {(unearnedAchievements as any[]).map((a: any) => (
               <div
                 key={a.id}
                 className="flex items-center gap-4 bg-white rounded-xl border border-gray-200 p-4 opacity-50"
