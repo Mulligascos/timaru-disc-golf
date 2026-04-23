@@ -47,11 +47,11 @@ export function ReportHazardButton({
     if (!file) return;
     setUploading(true);
     const path = `${userId}/${Date.now()}.${file.name.split(".").pop()}`;
-    const { error } = await supabase.storage
+    const { error } = await (supabase as any).storage
       .from("hazard-photos")
       .upload(path, file);
     if (!error) {
-      const { data } = supabase.storage
+      const { data } = (supabase as any).storage
         .from("hazard-photos")
         .getPublicUrl(path);
       setPhotoUrl(data.publicUrl);
@@ -81,7 +81,7 @@ export function ReportHazardButton({
     setSaving(true);
     setError("");
 
-    const { error } = await supabase.from("hazard_reports").insert({
+    const { error } = await (supabase as any).from("hazard_reports").insert({
       reported_by: userId,
       description: description.trim(),
       severity,

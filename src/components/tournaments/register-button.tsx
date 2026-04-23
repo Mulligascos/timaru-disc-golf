@@ -24,14 +24,14 @@ export function RegisterButton({
   async function toggle() {
     setLoading(true);
     if (isRegistered) {
-      await supabase
+      await (supabase as any)
         .from("tournament_registrations")
         .delete()
         .eq("tournament_id", tournamentId)
         .eq("player_id", userId);
       setIsRegistered(false);
     } else {
-      await supabase
+      await (supabase as any)
         .from("tournament_registrations")
         .insert({ tournament_id: tournamentId, player_id: userId });
       setIsRegistered(true);

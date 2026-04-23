@@ -40,11 +40,11 @@ export function NewImprovementButton({
     if (!file) return;
     setUploading(true);
     const path = `${userId}/${Date.now()}.${file.name.split(".").pop()}`;
-    const { error } = await supabase.storage
+    const { error } = await (supabase as any).storage
       .from("hazard-photos")
       .upload(path, file);
     if (!error) {
-      const { data } = supabase.storage
+      const { data } = (supabase as any).storage
         .from("hazard-photos")
         .getPublicUrl(path);
       setPhotoUrl(data.publicUrl);
@@ -64,14 +64,16 @@ export function NewImprovementButton({
     setSaving(true);
     setError("");
 
-    const { error } = await supabase.from("improvement_requests").insert({
-      submitted_by: userId,
-      title: title.trim(),
-      description: description.trim(),
-      course_id: courseId || null,
-      photo_url: photoUrl || null,
-      status: "open",
-    });
+    const { error } = await (supabase as any)
+      .from("improvement_requests")
+      .insert({
+        submitted_by: userId,
+        title: title.trim(),
+        description: description.trim(),
+        course_id: courseId || null,
+        photo_url: photoUrl || null,
+        status: "open",
+      });
 
     if (error) {
       setError(error.message);

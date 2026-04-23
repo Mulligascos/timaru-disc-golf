@@ -47,7 +47,7 @@ export function StartCasualRound({
     setCreating(true);
     setError("");
 
-    const { data: round, error: roundError } = await supabase
+    const { data: round, error: roundError } = await (supabase as any)
       .from("casual_rounds")
       .insert({
         course_id: courseId,
@@ -66,7 +66,7 @@ export function StartCasualRound({
     }
 
     for (const playerId of selectedIds) {
-      await supabase.from("scorecards").insert({
+      await (supabase as any).from("scorecards").insert({
         casual_round_id: round.id,
         player_id: playerId,
       });
@@ -283,7 +283,7 @@ export function ManageRound({
     setAdding(true);
     setError("");
 
-    const { error } = await supabase.from("scorecards").insert({
+    const { error } = await (supabase as any).from("scorecards").insert({
       casual_round_id: roundId,
       player_id: memberId,
     });

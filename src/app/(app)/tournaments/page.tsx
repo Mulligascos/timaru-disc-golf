@@ -56,10 +56,11 @@ export default async function TournamentsPage() {
     .order("start_date", { ascending: false });
 
   const active =
-    tournaments?.filter((t) => ["open", "in_progress"].includes(t.status)) ??
-    [];
-  const past = tournaments?.filter((t) => t.status === "completed") ?? [];
-  const drafts = tournaments?.filter((t) => t.status === "draft") ?? [];
+    (tournaments as any[])?.filter((t: any) =>
+      ["open", "in_progress"].includes(t.status),
+    ) ?? [];
+  const past = tournaments?.filter((t: any) => t.status === "completed") ?? [];
+  const drafts = tournaments?.filter((t: any) => t.status === "draft") ?? [];
 
   function TournamentCard({ t }: { t: any }) {
     return (

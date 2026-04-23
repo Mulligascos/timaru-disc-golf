@@ -163,7 +163,7 @@ export default async function LostFoundPage() {
             Found Discs 🔵
           </h2>
           <div className="space-y-3">
-            {foundDiscs.map((d) => (
+            {(foundDiscs as any[]).map((d: any) => (
               <DiscCard key={d.id} disc={d} type="found" />
             ))}
           </div>
@@ -177,7 +177,7 @@ export default async function LostFoundPage() {
             Lost Discs 🔴
           </h2>
           <div className="space-y-3">
-            {lostDiscs.map((d) => (
+            {(lostDiscs as any[]).map((d: any) => (
               <DiscCard key={d.id} disc={d} type="lost" />
             ))}
           </div>
@@ -191,7 +191,7 @@ export default async function LostFoundPage() {
             Recently Reunited ✅
           </h2>
           <div className="space-y-3">
-            {reunitedDiscs.map((d) => (
+            {(reunitedDiscs as any[]).map((d: any) => (
               <DiscCard key={d.id} disc={d} type="lost" />
             ))}
           </div>
@@ -240,7 +240,7 @@ function MarkReunitedButton({
         const { createClient } = await import("@/lib/supabase/server");
         const supabase = await createClient();
         const table = type === "lost" ? "lost_discs" : "found_discs";
-        await supabase
+        await (supabase as any)
           .from(table)
           .update({ status: "reunited" })
           .eq("id", discId);

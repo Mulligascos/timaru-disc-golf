@@ -24,7 +24,7 @@ export function MemberRoleToggle({
 
   async function toggle() {
     setLoading(true);
-    await supabase
+    await (supabase as any)
       .from("profiles")
       .update({ role: isAdmin ? "member" : "admin" })
       .eq("id", memberId);

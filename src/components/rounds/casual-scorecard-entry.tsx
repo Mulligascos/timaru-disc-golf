@@ -128,13 +128,13 @@ export function CasualScorecardEntry({
         const hole = holes.find((h) => h.id === holeId)!;
         const existing = player.existingScores[holeId];
         if (existing != null) {
-          await supabase
+          await (supabase as any)
             .from("scores")
             .update({ throws })
             .eq("scorecard_id", scorecardId)
             .eq("hole_id", holeId);
         } else {
-          await supabase.from("scores").upsert({
+          await (supabase as any).from("scores").upsert({
             scorecard_id: scorecardId,
             hole_id: holeId,
             hole_number: hole.hole_number,
@@ -209,12 +209,12 @@ export function CasualScorecardEntry({
         (sum, h) => sum + (scores[player.id]?.[h.id] ?? 0),
         0,
       );
-      await supabase
+      await (supabase as any)
         .from("scorecards")
         .update({ total_score: total })
         .eq("id", player.scorecardId);
     }
-    await supabase
+    await (supabase as any)
       .from("casual_rounds")
       .update({ is_complete: true, status: "completed" })
       .eq("id", roundId);
@@ -600,7 +600,7 @@ export function CasualScorecardEntry({
               </button>
               <button
                 onClick={async () => {
-                  await supabase
+                  await (supabase as any)
                     .from("casual_rounds")
                     .update({ status: "cancelled" })
                     .eq("id", roundId);

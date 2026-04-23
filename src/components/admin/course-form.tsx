@@ -28,7 +28,7 @@ export function CourseForm() {
         city: city || null,
         hole_count: holeCount,
         is_active: true,
-      })
+      } as any)
       .select()
       .single();
 
@@ -40,11 +40,11 @@ export function CourseForm() {
 
     // Create default holes
     const holes = Array.from({ length: holeCount }, (_, i) => ({
-      course_id: course.id,
+      course_id: (course as any).id,
       hole_number: i + 1,
       par: 3,
     }));
-    await supabase.from("holes").insert(holes);
+    await (supabase as any).from("holes").insert(holes);
 
     setName("");
     setCity("");

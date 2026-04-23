@@ -18,7 +18,7 @@ export function CreateTagsForm({ currentMax }: { currentMax: number }) {
       tag_number: currentMax + i + 1,
       is_active: true,
     }));
-    const { error } = await supabase.from("bag_tags").insert(tags);
+    const { error } = await (supabase as any).from("bag_tags").insert(tags);
     if (error) {
       setError(error.message);
       setSaving(false);

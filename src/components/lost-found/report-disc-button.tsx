@@ -53,7 +53,7 @@ export function ReportDiscButton({ userId, courses }: ReportDiscButtonProps) {
     setUploading(true);
     const ext = file.name.split(".").pop();
     const path = `${userId}/${Date.now()}.${ext}`;
-    const { error } = await supabase.storage
+    const { error } = await (supabase as any).storage
       .from("disc-photos")
       .upload(path, file);
     if (!error) {
@@ -81,7 +81,7 @@ export function ReportDiscButton({ userId, courses }: ReportDiscButtonProps) {
     };
 
     if (reportType === "lost") {
-      const { error } = await supabase.from("lost_discs").insert({
+      const { error } = await (supabase as any).from("lost_discs").insert({
         ...payload,
         disc_weight: weight ? parseInt(weight) : null,
         lost_on: date,
@@ -92,7 +92,7 @@ export function ReportDiscButton({ userId, courses }: ReportDiscButtonProps) {
         return;
       }
     } else {
-      const { error } = await supabase.from("found_discs").insert({
+      const { error } = await (supabase as any).from("found_discs").insert({
         ...payload,
         found_on: date,
       });

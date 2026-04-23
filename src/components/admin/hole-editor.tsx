@@ -37,7 +37,7 @@ export function HoleEditor({ courseId, holes, holeCount }: HoleEditorProps) {
   async function saveAll() {
     setSaving(true);
     for (const hole of localHoles) {
-      await supabase
+      await (supabase as any)
         .from("holes")
         .update({ par: hole.par, distance_m: hole.distance_m })
         .eq("id", hole.id);

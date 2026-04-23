@@ -25,12 +25,12 @@ export default async function CasualRoundPage({
     .eq("id", id)
     .single();
 
-  if (!round || round.status === "cancelled") notFound();
+  if (!round || (round as any).status === "cancelled") notFound();
 
   const { data: holes } = await supabase
     .from("holes")
     .select("*")
-    .eq("course_id", round.course_id)
+    .eq("course_id", (round as any).course_id)
     .order("hole_number", { ascending: true });
 
   if (!holes || holes.length === 0) {
@@ -48,8 +48,10 @@ export default async function CasualRoundPage({
   }
 
   // Re-order holes based on starting hole (wrap around)
-  const startingHole = round.starting_hole ?? 1;
-  const startIdx = holes.findIndex((h) => h.hole_number === startingHole);
+  const startingHole = (round as any).starting_hole ?? 1;
+  const startIdx = (holes as any[]).findIndex(
+    (h: any) => h.hole_number === startingHole,
+  );
   const orderedHoles =
     startIdx > 0
       ? [...holes.slice(startIdx), ...holes.slice(0, startIdx)]
@@ -60,7 +62,7 @@ export default async function CasualRoundPage({
     .select(
       "id, player_id, scores(throws, hole_id), profiles(id, full_name, username)",
     )
-    .eq("casual_round_id", round.id);
+    .eq("casual_round_id", (round as any).id);
 
   if (!scorecards || scorecards.length === 0) {
     return (
@@ -73,7 +75,7 @@ export default async function CasualRoundPage({
     );
   }
 
-  const players = scorecards.map((sc) => {
+  const players = (scorecards as any[]).map((sc: any) => {
     const profile = sc.profiles as any;
     const existingScores: Record<string, number> = {};
     for (const s of sc.scores ?? []) {
@@ -92,17 +94,17 @@ export default async function CasualRoundPage({
     .select("id, full_name, username")
     .eq("is_active", true);
 
-  const currentPlayerIds = scorecards.map((sc) => sc.player_id);
+  const currentPlayerIds = (scorecards as any[]).map((sc: any) => sc.player_id);
 
   return (
     <CasualScorecardEntry
       players={players}
       holes={orderedHoles}
-      roundId={round.id}
-      roundDate={round.played_on}
-      courseName={(round.courses as any)?.name ?? "Course"}
-      notes={round.notes}
-      isComplete={round.is_complete}
+      roundId={(round as any).id}
+      roundDate={(round as any).played_on}
+      courseName={(round as any).courses?.name ?? "Course"}
+      notes={(round as any).notes}
+      isComplete={(round as any).is_complete}
       startingHole={startingHole}
       allMembers={allMembers ?? []}
       currentPlayerIds={currentPlayerIds}

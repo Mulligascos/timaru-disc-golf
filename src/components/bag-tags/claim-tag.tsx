@@ -23,9 +23,9 @@ export function ClaimTag({ unclaimedTags, userId }: ClaimTagProps) {
     setError("");
 
     // Assign tag to user
-    const { error: tagError } = await supabase
+    const { error: tagError } = await (supabase as any)
       .from("bag_tags")
-      .update({ holder_id: userId })
+      .update({ holder_id: userId } as any)
       .eq("id", selectedTag);
 
     if (tagError) {
@@ -35,14 +35,14 @@ export function ClaimTag({ unclaimedTags, userId }: ClaimTagProps) {
     }
 
     // Update profile
-    await supabase
+    await (supabase as any)
       .from("profiles")
       .update({ current_tag_id: selectedTag })
       .eq("id", userId);
 
     // Record history
     const tag = unclaimedTags.find((t) => (t as any).id === selectedTag);
-    await supabase.from("tag_history").insert({
+    await (supabase as any).from("tag_history").insert({
       tag_id: selectedTag,
       from_holder_id: null,
       to_holder_id: userId,

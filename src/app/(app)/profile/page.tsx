@@ -44,7 +44,7 @@ export default async function ProfilePage() {
         <div className="bg-white rounded-2xl border border-gray-200 p-5">
           <h2 className="font-semibold text-gray-900 mb-4">Achievements</h2>
           <div className="flex flex-wrap gap-3">
-            {achievements.map((ma) => (
+            {(achievements as any[]).map((ma: any) => (
               <div
                 key={ma.id}
                 title={ma.achievements?.description ?? ""}

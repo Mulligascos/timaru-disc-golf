@@ -172,22 +172,22 @@ export function StartRoundButton({
     for (const { player, newTag } of newTagOrder) {
       if (!newTag) continue;
       // Skip if tag didn't change
-      if (player.tagId === new (tag as any).id()) continue;
+      if (player.tagId === newTag?.id) continue;
 
       // Update tag holder
-      await supabase
+      await (supabase as any)
         .from("bag_tags")
         .update({ holder_id: player.memberId })
-        .eq("id", new (tag as any).id());
-      await supabase
+        .eq("id", newTag?.id);
+      await (supabase as any)
         .from("profiles")
-        .update({ current_tag_id: new (tag as any).id() })
+        .update({ current_tag_id: newTag?.id } as any)
         .eq("id", player.memberId);
 
       // Log history
-      await supabase.from("tag_history").insert({
-        tag_id: new (tag as any).id(),
-        from_holder_id: new (tag as any).holder_id(),
+      await (supabase as any).from("tag_history").insert({
+        tag_id: newTag?.id,
+        from_holder_id: newTag?.holder_id,
         to_holder_id: player.memberId,
         notes: `Group round result`,
       });
@@ -197,7 +197,7 @@ export function StartRoundButton({
     const playerSummary = players
       .map((p) => `${p.name}: ${p.score}`)
       .join(", ");
-    await supabase.from("tag_challenges").insert({
+    await (supabase as any).from("tag_challenges").insert({
       challenger_id: userId,
       defender_id: userId, // self-reference for group rounds
       course_id: courseId || null,

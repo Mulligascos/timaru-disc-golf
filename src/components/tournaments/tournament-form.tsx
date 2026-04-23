@@ -56,7 +56,7 @@ export function TournamentForm({ courses, tournament }: TournamentFormProps) {
     };
 
     if (isEdit) {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from("tournaments")
         .update(payload)
         .eq("id", tournament.id);
@@ -67,7 +67,7 @@ export function TournamentForm({ courses, tournament }: TournamentFormProps) {
       }
 
       // Ensure correct number of round records exist
-      const { data: existingRounds } = await supabase
+      const { data: existingRounds } = await (supabase as any)
         .from("tournament_rounds")
         .select("id, round_number")
         .eq("tournament_id", tournament.id)
@@ -76,7 +76,7 @@ export function TournamentForm({ courses, tournament }: TournamentFormProps) {
       const existingCount = existingRounds?.length ?? 0;
       if (Number(rounds) > existingCount) {
         for (let i = existingCount + 1; i <= Number(rounds); i++) {
-          await supabase.from("tournament_rounds").insert({
+          await (supabase as any).from("tournament_rounds").insert({
             tournament_id: tournament.id,
             round_number: i,
             course_id: courseId || null,
@@ -86,7 +86,7 @@ export function TournamentForm({ courses, tournament }: TournamentFormProps) {
       }
       router.push(`/tournaments/${tournament.id}`);
     } else {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("tournaments")
         .insert(payload)
         .select()
@@ -99,7 +99,7 @@ export function TournamentForm({ courses, tournament }: TournamentFormProps) {
 
       // Create round records
       for (let i = 1; i <= Number(rounds); i++) {
-        await supabase.from("tournament_rounds").insert({
+        await (supabase as any).from("tournament_rounds").insert({
           tournament_id: data.id,
           round_number: i,
           course_id: courseId || null,

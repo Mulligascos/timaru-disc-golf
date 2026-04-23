@@ -27,7 +27,7 @@ export function UpvoteButton({
   async function toggle() {
     setLoading(true);
     if (hasUpvoted) {
-      await supabase
+      await (supabase as any)
         .from("improvement_upvotes")
         .delete()
         .eq("request_id", requestId)
@@ -35,7 +35,7 @@ export function UpvoteButton({
       setHasUpvoted(false);
       setLocalCount((c) => c - 1);
     } else {
-      await supabase
+      await (supabase as any)
         .from("improvement_upvotes")
         .insert({ request_id: requestId, member_id: userId });
       setHasUpvoted(true);

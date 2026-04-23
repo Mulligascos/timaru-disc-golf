@@ -38,7 +38,7 @@ export function ProfileForm({ profile, userId, email }: ProfileFormProps) {
     const fileExt = file.name.split(".").pop();
     const filePath = `${userId}/avatar.${fileExt}`;
 
-    const { error: uploadError } = await supabase.storage
+    const { error: uploadError } = await (supabase as any).storage
       .from("avatars")
       .upload(filePath, file, { upsert: true });
 
@@ -57,7 +57,7 @@ export function ProfileForm({ profile, userId, email }: ProfileFormProps) {
     setError("");
     setMessage("");
 
-    const { error } = await supabase
+    const { error } = await (supabase as any)
       .from("profiles")
       .update({
         full_name: fullName,

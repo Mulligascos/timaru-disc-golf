@@ -34,7 +34,7 @@ export function AuthForm({
     setMessage("");
 
     if (mode === "signup") {
-      const { error } = await supabase.auth.signUp({
+      const { error } = await (supabase as any).auth.signUp({
         email,
         password,
         options: {
@@ -48,7 +48,7 @@ export function AuthForm({
         setMessage("Check your email for a confirmation link!");
       }
     } else {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { error } = await (supabase as any).auth.signInWithPassword({
         email,
         password,
       });

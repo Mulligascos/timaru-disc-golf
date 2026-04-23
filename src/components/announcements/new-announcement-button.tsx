@@ -42,7 +42,7 @@ export function NewAnnouncementButton() {
       data: { user },
     } = await supabase.auth.getUser();
 
-    const { error } = await supabase.from("announcements").insert({
+    const { error } = await (supabase as any).from("announcements").insert({
       title: title.trim(),
       body: body.trim(),
       is_pinned: isPinned,

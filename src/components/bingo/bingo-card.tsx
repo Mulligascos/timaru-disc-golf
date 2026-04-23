@@ -75,7 +75,7 @@ export function BingoCard({
     const isCompleted = completed.has(sq.id);
 
     if (isCompleted) {
-      await supabase
+      await (supabase as any)
         .from("member_bingo_progress")
         .delete()
         .eq("member_id", userId)
@@ -86,7 +86,7 @@ export function BingoCard({
         return n;
       });
     } else {
-      await supabase
+      await (supabase as any)
         .from("member_bingo_progress")
         .insert({ member_id: userId, card_id: cardId, square_id: sq.id });
       setCompleted((prev) => new Set([...prev, sq.id]));
