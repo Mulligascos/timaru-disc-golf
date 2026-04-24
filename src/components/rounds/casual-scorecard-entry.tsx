@@ -13,6 +13,7 @@ import {
   MapPin,
 } from "lucide-react";
 import { ManageRound } from "@/components/rounds/start-casual-round";
+import { TagResolution } from "@/components/bag-tags/tag-resolution";
 
 interface Hole {
   id: string;
@@ -109,6 +110,8 @@ export function CasualScorecardEntry({
   );
   const [saving, setSaving] = useState<Record<string, boolean>>({});
   const [finishing, setFinishing] = useState(false);
+  const [showTagResolution, setShowTagResolution] = useState(false);
+  const [tagHolders, setTagHolders] = useState<any[]>([]);
 
   const currentHole = holes[currentHoleIdx];
   const d = dark;
@@ -204,6 +207,8 @@ export function CasualScorecardEntry({
 
   async function finishRound() {
     setFinishing(true);
+
+    // Save all scores and totals
     for (const player of players) {
       const total = holes.reduce(
         (sum, h) => sum + (scores[player.id]?.[h.id] ?? 0),
@@ -218,9 +223,39 @@ export function CasualScorecardEntry({
       .from("casual_rounds")
       .update({ is_complete: true, status: "completed" })
       .eq("id", roundId);
-    setIsComplete(true);
+
+    // Check if any players hold bag tags
+    const playerIds = players.map((p) => p.id);
+    const { data: tagData } = await (supabase as any)
+      .from("bag_tags")
+      .select("id, tag_number, holder_id")
+      .in("holder_id", playerIds)
+      .eq("is_active", true);
+
+    if (tagData && tagData.length >= 2) {
+      // Build tag holders with scores
+      const holders = tagData.map((tag: any) => {
+        const player = players.find((p) => p.id === tag.holder_id)!;
+        const total = holes.reduce(
+          (sum, h) => sum + (scores[player.id]?.[h.id] ?? 0),
+          0,
+        );
+        return {
+          playerId: player.id,
+          playerName: player.name,
+          tagId: tag.id,
+          tagNumber: tag.tag_number,
+          score: total,
+          playoffScore: null,
+        };
+      });
+      setTagHolders(holders);
+      setShowTagResolution(true);
+    } else {
+      setIsComplete(true);
+    }
+
     setFinishing(false);
-    router.refresh();
   }
 
   const allScored = players.every((p) =>
@@ -296,6 +331,18 @@ export function CasualScorecardEntry({
                 );
               })}
           </div>
+
+          {showTagResolution && tagHolders.length >= 2 && (
+            <TagResolution
+              roundId={roundId}
+              roundType="casual"
+              tagHolders={tagHolders}
+              onDismiss={() => {
+                setShowTagResolution(false);
+                setIsComplete(true);
+              }}
+            />
+          )}
           <button
             onClick={() => router.push("/dashboard")}
             className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-xl transition-colors"
