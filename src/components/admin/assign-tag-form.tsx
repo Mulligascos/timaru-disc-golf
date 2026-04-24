@@ -13,14 +13,14 @@ interface AssignTagFormProps {
 export function AssignTagForm({ unclaimedTags, members }: AssignTagFormProps) {
   const supabase = createClient();
   const router = useRouter();
-  const [tagId, setTagId] = useState("");
+  const [tag_id, setTagId] = useState("");
   const [memberId, setMemberId] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
   async function handleAssign() {
-    if (!tagId || !memberId) {
+    if (!tag_id || !memberId) {
       setError("Select both a tag and a member.");
       return;
     }
@@ -32,7 +32,7 @@ export function AssignTagForm({ unclaimedTags, members }: AssignTagFormProps) {
     const { error: tagError } = await (supabase as any)
       .from("bag_tags")
       .update({ holder_id: memberId })
-      .eq("id", tagId);
+      .eq("id", tag_id);
 
     if (tagError) {
       setError(tagError.message);
@@ -43,14 +43,14 @@ export function AssignTagForm({ unclaimedTags, members }: AssignTagFormProps) {
     // Update profile
     await (supabase as any)
       .from("profiles")
-      .update({ current_tag_id: tagId })
+      .update({ current_tag_id: tag_id })
       .eq("id", memberId);
 
     // Log history
-    const tag = unclaimedTags.find((t) => t.id === tagId);
+    const tag = unclaimedTags.find((t) => t.id === tag_id);
     const member = members.find((m) => m.id === memberId);
     await (supabase as any).from("tag_history").insert({
-      tag_id: tagId,
+      tag_id: tag_id,
       from_holder_id: null,
       to_holder_id: memberId,
       notes: `Assigned by admin`,
@@ -73,7 +73,7 @@ export function AssignTagForm({ unclaimedTags, members }: AssignTagFormProps) {
             Tag Number
           </label>
           <select
-            value={tagId}
+            value={tag_id}
             onChange={(e) => setTagId(e.target.value)}
             className="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
           >
@@ -113,7 +113,7 @@ export function AssignTagForm({ unclaimedTags, members }: AssignTagFormProps) {
 
       <button
         onClick={handleAssign}
-        disabled={saving || !tagId || !memberId}
+        disabled={saving || !tag_id || !memberId}
         className="w-full flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-40 text-white font-semibold py-2.5 rounded-xl transition-colors text-sm"
       >
         {saving ? "Assigning..." : "Assign Tag"}

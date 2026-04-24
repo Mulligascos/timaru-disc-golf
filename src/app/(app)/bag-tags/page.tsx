@@ -12,7 +12,7 @@ export default async function BagTagsPage() {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
-
+  const currentSeason = new Date().getFullYear().toString();
   const [{ data: profile }, { data: tags }, { data: history }] =
     await Promise.all([
       supabase
@@ -24,6 +24,7 @@ export default async function BagTagsPage() {
         .from("bag_tags")
         .select("*, profiles(id, username, full_name, avatar_url)")
         .eq("is_active", true)
+        .eq("season", currentSeason)
         .order("tag_number", { ascending: true }),
       supabase
         .from("tag_history")
@@ -38,7 +39,6 @@ export default async function BagTagsPage() {
   const allTags = (tags as any[]) ?? [];
   const claimed = allTags.filter((t) => t.holder_id);
   const unclaimed = allTags.filter((t) => !t.holder_id);
-  const currentSeason = new Date().getFullYear().toString();
 
   return (
     <div className="space-y-6">
@@ -116,7 +116,7 @@ export default async function BagTagsPage() {
           number.
         </p>
         <p className="text-xs text-blue-600 mt-1">
-          Season runs September 1 → October 31 each year.
+          Season runs October 1st → September 30th each year.
         </p>
       </div>
 

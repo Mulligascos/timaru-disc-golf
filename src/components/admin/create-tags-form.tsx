@@ -14,8 +14,10 @@ export function CreateTagsForm({ currentMax }: { currentMax: number }) {
   async function handleCreate() {
     setSaving(true);
     setError("");
+    const season = new Date().getFullYear().toString(); // ← add this
     const tags = Array.from({ length: count }, (_, i) => ({
       tag_number: currentMax + i + 1,
+      season, // ← add this
       is_active: true,
     }));
     const { error } = await (supabase as any).from("bag_tags").insert(tags);
