@@ -28,7 +28,9 @@ export default async function AdminBagTagsPage() {
     await Promise.all([
       supabase
         .from("bag_tags")
-        .select("*, profiles(id, full_name, username)")
+        .select(
+          "*, holder:profiles!bag_tags_holder_id_fkey(id, full_name, username)",
+        )
         .eq("is_active", true)
         .eq("season", currentSeason)
         .order("tag_number", { ascending: true }),
