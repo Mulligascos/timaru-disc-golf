@@ -103,14 +103,20 @@ export default async function DashboardPage() {
   ];
 
   const firstName =
-    (profile as any)?.full_name?.split(" ")[0] ??
     (profile as any)?.username ??
-    "there";
+    (profile as any)?.full_name?.split(" ")[0] ??
+    "";
 
   return (
     <div className="space-y-6">
       {/* Hero */}
       <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl p-6 text-white">
+        {/* Watermark logo */}
+        <img
+          src="/components/theme/images/DARKLOGO.png"
+          alt=""
+          className="absolute -right-6 -bottom-6 w-40 h-40 object-contain opacity-10 pointer-events-none select-none"
+        />
         <p className="text-green-400 text-sm font-medium">Welcome back</p>
         <h1 className="text-2xl font-bold mt-1">{firstName} 👋</h1>
         <div className="flex items-center gap-3 mt-3 flex-wrap">
