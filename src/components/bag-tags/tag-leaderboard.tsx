@@ -38,7 +38,7 @@ export function TagLeaderboard({ tags, currentUserId }: TagLeaderboardProps) {
           {claimed.map((tag, i) => {
             const isMe = (tag as any).holder_id === currentUserId;
             const name =
-              tag.profiles?.full_name ?? tag.profiles?.username ?? "Unknown";
+              tag.holder?.full_name ?? tag.holder?.username ?? "Unknown";
             const initials = name.charAt(0).toUpperCase();
 
             return (
