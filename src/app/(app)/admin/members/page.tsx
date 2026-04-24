@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ChevronLeft, UserCheck, UserX } from "lucide-react";
 import { InviteMemberForm } from "@/components/admin/invite-member-form";
 import type { Metadata } from "next";
+import { BulkImportForm } from "@/components/admin/bulk-import-form";
 
 export const metadata: Metadata = { title: "Admin — Members" };
 export const dynamic = "force-dynamic";
@@ -44,7 +45,6 @@ export default async function AdminMembersPage() {
           </p>
         </div>
       </div>
-
       {/* Invite new member */}
       <div className="bg-white rounded-2xl border border-gray-200 p-5">
         <h2 className="font-semibold text-gray-900 mb-1">Invite New Member</h2>
@@ -54,7 +54,18 @@ export default async function AdminMembersPage() {
         </p>
         <InviteMemberForm />
       </div>
-
+      // Add this section after the invite form section:
+      <div className="bg-white rounded-2xl border border-gray-200 p-5">
+        <h2 className="font-semibold text-gray-900 mb-1">
+          Bulk Import Members
+        </h2>
+        <p className="text-xs text-gray-500 mb-4">
+          Upload a CSV or paste member data to create multiple accounts at once.
+          All accounts will be created with the default password:{" "}
+          <code className="bg-gray-100 px-1 rounded">DiscGolf2026!</code>
+        </p>
+        <BulkImportForm />
+      </div>
       {/* Active members */}
       <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
         <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
@@ -100,7 +111,6 @@ export default async function AdminMembersPage() {
           )}
         </div>
       </div>
-
       {/* Inactive members */}
       {inactiveMembers.length > 0 && (
         <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
