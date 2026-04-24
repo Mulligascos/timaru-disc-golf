@@ -24,20 +24,23 @@ export default async function AdminBagTagsPage() {
 
   const currentSeason = new Date().getFullYear().toString();
 
-  const [{ data: tags }, { data: members }] = await Promise.all([
-    supabase
-      .from("bag_tags")
-      .select("*, profiles(id, full_name, username)")
-      .eq("is_active", true)
-      .eq("season", currentSeason)
-      .order("tag_number", { ascending: true }),
-    supabase
-      .from("profiles")
-      .select("id, full_name, username, current_tag_id")
-      .eq("is_active", true)
-      //.eq("season", currentSeason)
-      .order("full_name", { ascending: true }),
-  ]);
+  const [{ data: tags, error: tagsError }, { data: members }] =
+    await Promise.all([
+      supabase
+        .from("bag_tags")
+        .select("*, profiles(id, full_name, username)")
+        .eq("is_active", true)
+        .eq("season", currentSeason)
+        .order("tag_number", { ascending: true }),
+      supabase
+        .from("profiles")
+        .select("id, full_name, username, current_tag_id")
+        .eq("is_active", true)
+        //.eq("season", currentSeason)
+        .order("full_name", { ascending: true }),
+    ]);
+  console.log("DEBUG tags query result:", JSON.stringify(tags, null, 2));
+  console.log("DEBUG tags error:", JSON.stringify(tagsError, null, 2));
 
   const allTags = (tags as any[]) ?? [];
   const allMembers = (members as any[]) ?? [];
