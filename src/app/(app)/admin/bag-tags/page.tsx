@@ -121,9 +121,7 @@ export default async function AdminBagTagsPage() {
               <div className="flex-1 min-w-0">
                 {tag.holder_id ? (
                   <p className="text-sm font-semibold text-gray-900 truncate">
-                    {tag.profiles?.full_name ??
-                      tag.profiles?.username ??
-                      "Unknown"}
+                    {tag.holder?.full_name ?? tag.holder?.username ?? "Unknown"}
                   </p>
                 ) : (
                   <p className="text-sm text-gray-400 italic">Unassigned</p>

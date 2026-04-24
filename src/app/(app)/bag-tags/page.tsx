@@ -139,9 +139,7 @@ export default async function BagTagsPage() {
               {claimed.map((tag: any, i: number) => {
                 const isMe = tag.holder_id === user.id;
                 const name =
-                  tag.profiles?.full_name ??
-                  tag.profiles?.username ??
-                  "Unknown";
+                  tag.holder?.full_name ?? tag.holder?.username ?? "Unknown";
                 const initials = name.charAt(0).toUpperCase();
 
                 return (
