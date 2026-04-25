@@ -17,6 +17,7 @@ import {
   Shield,
 } from "lucide-react";
 import { MoreMenu } from "@/components/layout/more-menu";
+import { ProgressBar } from "@/components/ui/progress-bar";
 
 const navItems = [
   { href: "/dashboard", label: "Home", icon: Home },
@@ -161,6 +162,7 @@ export default async function AppLayout({
       {/* ── Main content ── */}
       <div className="lg:pl-64">
         <main className="px-4 py-6 pb-24 lg:pb-8 lg:px-8 max-w-4xl mx-auto">
+          <ProgressBar />
           {children}
         </main>
       </div>
