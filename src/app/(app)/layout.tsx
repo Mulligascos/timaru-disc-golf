@@ -16,6 +16,7 @@ import {
   User,
   Shield,
 } from "lucide-react";
+import { MoreMenu } from "@/components/layout/more-menu";
 
 const navItems = [
   { href: "/dashboard", label: "Home", icon: Home },
@@ -31,7 +32,6 @@ const navItems = [
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
-// Bottom tab bar — 5 most important items
 const bottomTabs = [
   { href: "/dashboard", label: "Home", icon: Home },
   { href: "/tournaments", label: "Events", icon: Trophy },
@@ -72,7 +72,6 @@ export default async function AppLayout({
       {/* ── Desktop sidebar ── */}
       <aside className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col z-40">
         <div className="flex flex-col flex-1 bg-gray-900 overflow-y-auto">
-          {/* Logo */}
           <div className="flex items-center gap-3 px-6 py-5 border-b border-gray-800">
             <span className="text-2xl">🥏</span>
             <div>
@@ -84,8 +83,6 @@ export default async function AppLayout({
               </p>
             </div>
           </div>
-
-          {/* Nav */}
           <nav className="flex-1 px-3 py-4 space-y-1">
             {navItems.map(({ href, label, icon: Icon }) => (
               <Link
@@ -110,8 +107,6 @@ export default async function AppLayout({
               </Link>
             )}
           </nav>
-
-          {/* Profile footer */}
           <div className="px-3 py-4 border-t border-gray-800">
             <Link
               href="/profile"
@@ -182,14 +177,8 @@ export default async function AppLayout({
             <span className="text-xs font-medium">{label}</span>
           </Link>
         ))}
-        {/* More menu — links to the rest */}
-        <Link
-          href="/announcements"
-          className="flex-1 flex flex-col items-center justify-center py-2 gap-1 text-gray-400 hover:text-green-400 transition-colors"
-        >
-          <Megaphone size={22} />
-          <span className="text-xs font-medium">More</span>
-        </Link>
+        {/* More menu */}
+        <MoreMenu isAdmin={isAdmin} />
       </nav>
     </div>
   );

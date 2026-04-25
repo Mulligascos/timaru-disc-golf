@@ -2,9 +2,11 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { Megaphone, Pin } from "lucide-react";
 import { NewAnnouncementButton } from "@/components/announcements/new-announcement-button";
+import { AnnouncementActions } from "@/components/announcements/announcement-actions";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = { title: "Announcements" };
+export const dynamic = "force-dynamic";
 
 export default async function AnnouncementsPage() {
   const supabase = await createClient();
@@ -83,15 +85,26 @@ export default async function AnnouncementsPage() {
                 year: "numeric",
               })}
             </p>
-            {a.expires_at && (
-              <p className="text-xs text-orange-500">
-                Expires{" "}
-                {new Date(a.expires_at).toLocaleDateString("en-NZ", {
-                  day: "numeric",
-                  month: "short",
-                })}
-              </p>
-            )}
+            <div className="flex items-center gap-2">
+              {a.expires_at && (
+                <p className="text-xs text-orange-500">
+                  Expires{" "}
+                  {new Date(a.expires_at).toLocaleDateString("en-NZ", {
+                    day: "numeric",
+                    month: "short",
+                  })}
+                </p>
+              )}
+              {isAdmin && (
+                <AnnouncementActions
+                  id={a.id}
+                  title={a.title}
+                  body={a.body}
+                  isPinned={a.is_pinned}
+                  isDraft={isDraft}
+                />
+              )}
+            </div>
           </div>
         </div>
       </div>
