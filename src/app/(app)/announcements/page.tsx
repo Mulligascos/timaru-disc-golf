@@ -20,7 +20,6 @@ export default async function AnnouncementsPage() {
     .select("role")
     .eq("id", user.id)
     .single();
-
   const isAdmin = (profile as any)?.role === "admin";
 
   const { data: announcements } = await supabase
@@ -42,21 +41,26 @@ export default async function AnnouncementsPage() {
   function AnnouncementCard({
     a,
     isDraft = false,
+    isAdmin,
   }: {
     a: any;
     isDraft?: boolean;
+    isAdmin: boolean;
   }) {
     const author = a.profiles?.full_name ?? a.profiles?.username ?? "Admin";
     const date = a.published_at ?? a.created_at;
     return (
       <div
-        className={`bg-white rounded-2xl border overflow-hidden ${
-          a.is_pinned
-            ? "border-green-300"
+        className="rounded-2xl border overflow-hidden"
+        style={{
+          background: "var(--bg-card)",
+          borderColor: a.is_pinned
+            ? "var(--accent-300)"
             : isDraft
-              ? "border-dashed border-gray-300"
-              : "border-gray-200"
-        }`}
+              ? "var(--border-colour)"
+              : "var(--border-colour)",
+          borderStyle: isDraft ? "dashed" : "solid",
+        }}
       >
         {a.is_pinned && (
           <div className="bg-green-500 px-4 py-1.5 flex items-center gap-1.5">
@@ -65,19 +69,33 @@ export default async function AnnouncementsPage() {
           </div>
         )}
         {isDraft && (
-          <div className="bg-gray-100 px-4 py-1.5">
-            <span className="text-gray-500 text-xs font-semibold">
+          <div
+            className="px-4 py-1.5"
+            style={{ background: "var(--bg-primary)" }}
+          >
+            <span
+              className="text-xs font-semibold"
+              style={{ color: "var(--text-secondary)" }}
+            >
               Draft — not published
             </span>
           </div>
         )}
         <div className="p-5">
-          <h3 className="font-bold text-gray-900">{a.title}</h3>
-          <p className="text-gray-600 text-sm mt-2 leading-relaxed whitespace-pre-wrap">
+          <h3 className="font-bold" style={{ color: "var(--text-primary)" }}>
+            {a.title}
+          </h3>
+          <p
+            className="text-sm mt-2 leading-relaxed whitespace-pre-wrap"
+            style={{ color: "var(--text-secondary)" }}
+          >
             {a.body}
           </p>
-          <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-100">
-            <p className="text-xs text-gray-400">
+          <div
+            className="flex items-center justify-between mt-4 pt-3"
+            style={{ borderTop: "1px solid var(--border-colour)" }}
+          >
+            <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
               {author} ·{" "}
               {new Date(date).toLocaleDateString("en-NZ", {
                 day: "numeric",
@@ -115,20 +133,33 @@ export default async function AnnouncementsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Announcements</h1>
-          <p className="text-gray-500 text-sm mt-1">Club news and updates</p>
+          <h1
+            className="text-2xl font-bold"
+            style={{ color: "var(--text-primary)" }}
+          >
+            Announcements
+          </h1>
+          <p
+            className="text-sm mt-1"
+            style={{ color: "var(--text-secondary)" }}
+          >
+            Club news and updates
+          </p>
         </div>
         {isAdmin && <NewAnnouncementButton />}
       </div>
 
       {isAdmin && drafts && drafts.length > 0 && (
         <section>
-          <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
+          <h2
+            className="text-xs font-semibold uppercase tracking-wide mb-3"
+            style={{ color: "var(--text-secondary)" }}
+          >
             Drafts
           </h2>
           <div className="space-y-3">
             {(drafts as any[]).map((a: any) => (
-              <AnnouncementCard key={a.id} a={a} isDraft />
+              <AnnouncementCard key={a.id} a={a} isDraft isAdmin={isAdmin} />
             ))}
           </div>
         </section>
@@ -137,14 +168,26 @@ export default async function AnnouncementsPage() {
       {announcements && announcements.length > 0 ? (
         <div className="space-y-3">
           {(announcements as any[]).map((a: any) => (
-            <AnnouncementCard key={a.id} a={a} />
+            <AnnouncementCard key={a.id} a={a} isAdmin={isAdmin} />
           ))}
         </div>
       ) : (
         <div className="text-center py-16">
-          <Megaphone size={48} className="mx-auto text-gray-300 mb-4" />
-          <p className="font-semibold text-gray-600">No announcements yet</p>
-          <p className="text-sm text-gray-400 mt-1">
+          <Megaphone
+            size={48}
+            className="mx-auto mb-4"
+            style={{ color: "var(--border-colour)" }}
+          />
+          <p
+            className="font-semibold"
+            style={{ color: "var(--text-secondary)" }}
+          >
+            No announcements yet
+          </p>
+          <p
+            className="text-sm mt-1"
+            style={{ color: "var(--text-secondary)" }}
+          >
             Check back later for club news.
           </p>
         </div>

@@ -64,16 +64,14 @@ export default async function TournamentsPage() {
     return (
       <Link
         href={`/tournaments/${t.id}`}
-        className="flex items-center gap-4 bg-white rounded-xl border border-gray-200 p-4 hover:border-gray-300 active:scale-[0.98] transition-all"
+        className="flex items-center gap-4 rounded-xl border p-4 active:scale-[0.98] transition-all"
+        style={{
+          background: "var(--bg-card)",
+          borderColor: "var(--border-colour)",
+        }}
       >
         <div
-          className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
-            t.status === "in_progress"
-              ? "bg-green-100"
-              : t.status === "completed"
-                ? "bg-purple-100"
-                : "bg-blue-100"
-          }`}
+          className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${t.status === "in_progress" ? "bg-green-100" : t.status === "completed" ? "bg-purple-100" : "bg-blue-100"}`}
         >
           <Trophy
             size={22}
@@ -88,7 +86,10 @@ export default async function TournamentsPage() {
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <p className="font-semibold text-gray-900 text-sm truncate">
+            <p
+              className="font-semibold text-sm truncate"
+              style={{ color: "var(--text-primary)" }}
+            >
               {t.name}
             </p>
             <span
@@ -97,7 +98,10 @@ export default async function TournamentsPage() {
               {statusLabel[t.status]}
             </span>
           </div>
-          <div className="flex items-center gap-3 mt-1 text-xs text-gray-500 flex-wrap">
+          <div
+            className="flex items-center gap-3 mt-1 text-xs flex-wrap"
+            style={{ color: "var(--text-secondary)" }}
+          >
             <span className="flex items-center gap-1">
               <Calendar size={11} />
               {new Date(t.start_date).toLocaleDateString("en-NZ", {
@@ -116,7 +120,11 @@ export default async function TournamentsPage() {
             </span>
           </div>
         </div>
-        <ChevronRight size={16} className="text-gray-400 flex-shrink-0" />
+        <ChevronRight
+          size={16}
+          className="flex-shrink-0"
+          style={{ color: "var(--text-secondary)" }}
+        />
       </Link>
     );
   }
@@ -125,8 +133,16 @@ export default async function TournamentsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Tournaments</h1>
-          <p className="text-gray-500 text-sm mt-1">
+          <h1
+            className="text-2xl font-bold"
+            style={{ color: "var(--text-primary)" }}
+          >
+            Tournaments
+          </h1>
+          <p
+            className="text-sm mt-1"
+            style={{ color: "var(--text-secondary)" }}
+          >
             Club events and league play
           </p>
         </div>
@@ -142,7 +158,10 @@ export default async function TournamentsPage() {
 
       {active.length > 0 && (
         <section>
-          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+          <h2
+            className="text-xs font-semibold uppercase tracking-wide mb-3"
+            style={{ color: "var(--text-secondary)" }}
+          >
             Active & Open
           </h2>
           <div className="space-y-2">
@@ -155,7 +174,10 @@ export default async function TournamentsPage() {
 
       {isAdmin && drafts.length > 0 && (
         <section>
-          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+          <h2
+            className="text-xs font-semibold uppercase tracking-wide mb-3"
+            style={{ color: "var(--text-secondary)" }}
+          >
             Drafts
           </h2>
           <div className="space-y-2">
@@ -168,7 +190,10 @@ export default async function TournamentsPage() {
 
       {past.length > 0 && (
         <section>
-          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+          <h2
+            className="text-xs font-semibold uppercase tracking-wide mb-3"
+            style={{ color: "var(--text-secondary)" }}
+          >
             Past Events
           </h2>
           <div className="space-y-2">
@@ -182,7 +207,12 @@ export default async function TournamentsPage() {
       {(!tournaments || (tournaments as any[]).length === 0) && (
         <div className="text-center py-16">
           <Trophy size={48} className="mx-auto text-gray-300 mb-4" />
-          <p className="font-semibold text-gray-600">No tournaments yet</p>
+          <p
+            className="font-semibold"
+            style={{ color: "var(--text-secondary)" }}
+          >
+            No tournaments yet
+          </p>
           {isAdmin && (
             <Link
               href="/tournaments/new"

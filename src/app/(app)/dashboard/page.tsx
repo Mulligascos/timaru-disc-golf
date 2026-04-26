@@ -23,7 +23,6 @@ export default async function DashboardPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  // All queries in parallel
   const [
     { data: profile },
     { data: announcements },
@@ -110,8 +109,7 @@ export default async function DashboardPage() {
   return (
     <div className="space-y-6">
       {/* Hero */}
-      <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl p-6 text-white">
-        {/* Watermark logo */}
+      <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl p-6 text-white relative overflow-hidden">
         <img
           src="/images/DARKLOGO.png"
           alt=""
@@ -149,7 +147,10 @@ export default async function DashboardPage() {
 
       {/* Quick links */}
       <div>
-        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
+        <h2
+          className="text-sm font-semibold uppercase tracking-wide mb-3"
+          style={{ color: "var(--text-secondary)" }}
+        >
           Quick Access
         </h2>
         <div className="grid grid-cols-3 gap-3">
@@ -157,14 +158,21 @@ export default async function DashboardPage() {
             <Link
               key={href}
               href={href}
-              className="flex flex-col items-center gap-2 bg-white rounded-xl border border-gray-200 p-4 hover:border-gray-300 active:scale-95 transition-all"
+              className="flex flex-col items-center gap-2 rounded-xl border p-4 hover:scale-[1.02] active:scale-95 transition-all"
+              style={{
+                background: "var(--bg-card)",
+                borderColor: "var(--border-colour)",
+              }}
             >
               <div
                 className={`w-10 h-10 ${colour} rounded-xl flex items-center justify-center`}
               >
                 <Icon size={20} className="text-white" />
               </div>
-              <span className="text-xs font-medium text-gray-700 text-center leading-tight">
+              <span
+                className="text-xs font-medium text-center leading-tight"
+                style={{ color: "var(--text-primary)" }}
+              >
                 {label}
               </span>
             </Link>
@@ -175,7 +183,10 @@ export default async function DashboardPage() {
       {/* Recent rounds */}
       {recentRounds && (recentRounds as any[]).length > 0 && (
         <div>
-          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
+          <h2
+            className="text-sm font-semibold uppercase tracking-wide mb-3"
+            style={{ color: "var(--text-secondary)" }}
+          >
             Recent Rounds
           </h2>
           <div className="space-y-2">
@@ -183,7 +194,11 @@ export default async function DashboardPage() {
               <Link
                 key={round.id}
                 href={`/rounds/${round.id}`}
-                className="flex items-center gap-3 bg-white rounded-xl border border-gray-200 p-4 hover:border-gray-300 transition-colors"
+                className="flex items-center gap-3 rounded-xl border p-4 transition-colors"
+                style={{
+                  background: "var(--bg-card)",
+                  borderColor: "var(--border-colour)",
+                }}
               >
                 <div
                   className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${round.is_complete ? "bg-green-100" : "bg-yellow-100"}`}
@@ -196,10 +211,16 @@ export default async function DashboardPage() {
                   />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-gray-900 text-sm">
+                  <p
+                    className="font-semibold text-sm"
+                    style={{ color: "var(--text-primary)" }}
+                  >
                     {round.courses?.name ?? "Casual Round"}
                   </p>
-                  <p className="text-xs text-gray-500 mt-0.5">
+                  <p
+                    className="text-xs mt-0.5"
+                    style={{ color: "var(--text-secondary)" }}
+                  >
                     {new Date(round.played_on).toLocaleDateString("en-NZ", {
                       day: "numeric",
                       month: "short",
@@ -213,7 +234,8 @@ export default async function DashboardPage() {
                 </span>
                 <ChevronRight
                   size={16}
-                  className="text-gray-400 flex-shrink-0"
+                  className="flex-shrink-0"
+                  style={{ color: "var(--text-secondary)" }}
                 />
               </Link>
             ))}
@@ -225,12 +247,16 @@ export default async function DashboardPage() {
       {announcements && (announcements as any[]).length > 0 && (
         <div>
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
+            <h2
+              className="text-sm font-semibold uppercase tracking-wide"
+              style={{ color: "var(--text-secondary)" }}
+            >
               Announcements
             </h2>
             <Link
               href="/announcements"
-              className="text-xs text-green-600 font-medium"
+              className="text-xs font-medium"
+              style={{ color: "var(--accent-600)" }}
             >
               See all
             </Link>
@@ -239,17 +265,35 @@ export default async function DashboardPage() {
             {(announcements as any[]).map((a: any) => (
               <div
                 key={a.id}
-                className={`bg-white rounded-xl border p-4 ${a.is_pinned ? "border-green-300" : "border-gray-200"}`}
+                className="rounded-xl border p-4"
+                style={{
+                  background: "var(--bg-card)",
+                  borderColor: a.is_pinned
+                    ? "var(--accent-300)"
+                    : "var(--border-colour)",
+                }}
               >
                 {a.is_pinned && (
-                  <span className="text-xs font-semibold text-green-600 bg-green-50 px-2 py-0.5 rounded-full mb-2 inline-block">
+                  <span
+                    className="text-xs font-semibold px-2 py-0.5 rounded-full mb-2 inline-block"
+                    style={{
+                      color: "var(--accent-700)",
+                      background: "var(--accent-50)",
+                    }}
+                  >
                     📌 Pinned
                   </span>
                 )}
-                <h3 className="font-semibold text-gray-900 text-sm">
+                <h3
+                  className="font-semibold text-sm"
+                  style={{ color: "var(--text-primary)" }}
+                >
                   {a.title}
                 </h3>
-                <p className="text-gray-500 text-sm mt-1 line-clamp-2">
+                <p
+                  className="text-sm mt-1 line-clamp-2"
+                  style={{ color: "var(--text-secondary)" }}
+                >
                   {a.body}
                 </p>
               </div>
@@ -262,12 +306,16 @@ export default async function DashboardPage() {
       {tournaments && (tournaments as any[]).length > 0 && (
         <div>
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
+            <h2
+              className="text-sm font-semibold uppercase tracking-wide"
+              style={{ color: "var(--text-secondary)" }}
+            >
               Active Events
             </h2>
             <Link
               href="/tournaments"
-              className="text-xs text-green-600 font-medium"
+              className="text-xs font-medium"
+              style={{ color: "var(--accent-600)" }}
             >
               See all
             </Link>
@@ -277,7 +325,11 @@ export default async function DashboardPage() {
               <Link
                 key={t.id}
                 href={`/tournaments/${t.id}`}
-                className="flex items-center gap-4 bg-white rounded-xl border border-gray-200 p-4 hover:border-gray-300 transition-colors"
+                className="flex items-center gap-4 rounded-xl border p-4 transition-colors"
+                style={{
+                  background: "var(--bg-card)",
+                  borderColor: "var(--border-colour)",
+                }}
               >
                 <div
                   className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${t.status === "in_progress" ? "bg-green-100" : "bg-blue-100"}`}
@@ -292,10 +344,16 @@ export default async function DashboardPage() {
                   />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-gray-900 text-sm truncate">
+                  <p
+                    className="font-semibold text-sm truncate"
+                    style={{ color: "var(--text-primary)" }}
+                  >
                     {t.name}
                   </p>
-                  <p className="text-gray-500 text-xs mt-0.5">
+                  <p
+                    className="text-xs mt-0.5"
+                    style={{ color: "var(--text-secondary)" }}
+                  >
                     {new Date(t.start_date).toLocaleDateString("en-NZ", {
                       day: "numeric",
                       month: "short",
@@ -309,7 +367,10 @@ export default async function DashboardPage() {
                   >
                     {t.status === "in_progress" ? "Live" : "Open"}
                   </span>
-                  <ChevronRight size={16} className="text-gray-400" />
+                  <ChevronRight
+                    size={16}
+                    style={{ color: "var(--text-secondary)" }}
+                  />
                 </div>
               </Link>
             ))}
