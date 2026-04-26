@@ -93,8 +93,8 @@ function applyTheme(settings: ThemeSettings) {
 
   // Dark mode body background
   if (settings.mode === "dark") {
-    root.style.setProperty("--bg-primary", "#0f172a");
-    root.style.setProperty("--bg-card", "#1e293b");
+    root.style.setProperty("--bg-primary", "#000000");
+    root.style.setProperty("--bg-card", "#111111");
     root.style.setProperty("--text-primary", "#f1f5f9");
     root.style.setProperty("--text-secondary", "#94a3b8");
     root.style.setProperty("--border-colour", "#334155");

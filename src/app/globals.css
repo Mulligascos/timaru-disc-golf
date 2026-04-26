@@ -12,35 +12,13 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--bg-primary, var(--background));
+  color: var(--text-primary, var(--foreground));
   font-family: Arial, Helvetica, sans-serif;
 }
 
-.scoring-page {
-  background-color: #0d2818;
-}
-
-/* Smooth score number transitions */
-.score-number {
-  transition: color 0.15s ease;
-}
-
-/* Active scale for buttons */
-.active\:scale-90:active {
-  transform: scale(0.9);
-}
-/* Add these to your src/app/globals.css */
-/* They provide the CSS variable foundation for the theme system */
-
+/* ── CSS Variable foundation for theme system ── */
 :root {
   --app-font-size: 16px;
   --accent-500: #22c55e;
@@ -63,13 +41,38 @@ html {
   font-size: var(--app-font-size);
 }
 
-/* Dark mode base */
+/* ── Dark mode base ── */
 html.dark body {
   background-color: var(--bg-primary);
   color: var(--text-primary);
 }
 
-/* Smooth theme transitions */
+/* ── Fix inputs/selects/textareas in all modes ── */
+input,
+select,
+textarea {
+  color: var(--text-primary) !important;
+  background-color: var(--bg-card) !important;
+  border-color: var(--border-colour) !important;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-secondary) !important;
+  opacity: 1;
+}
+
+/* Fix select arrow and option colours */
+select {
+  color-scheme: light dark;
+}
+
+select option {
+  background-color: var(--bg-card);
+  color: var(--text-primary);
+}
+
+/* ── Smooth theme transitions ── */
 *,
 *::before,
 *::after {
@@ -79,7 +82,7 @@ html.dark body {
     color 0.15s ease;
 }
 
-/* Override transition for interactive elements that need to be instant */
+/* Override transition for interactive elements */
 button,
 a,
 input,
@@ -91,4 +94,19 @@ textarea {
     color 0.1s ease,
     opacity 0.15s ease,
     transform 0.1s ease;
+}
+
+/* ── Scoring panel ── */
+.scoring-page {
+  background-color: #000000;
+}
+
+/* Smooth score number transitions */
+.score-number {
+  transition: color 0.15s ease;
+}
+
+/* Active scale for buttons */
+.active\:scale-90:active {
+  transform: scale(0.9);
 }
