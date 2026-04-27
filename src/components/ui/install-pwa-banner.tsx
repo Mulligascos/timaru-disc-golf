@@ -10,9 +10,7 @@ export function InstallPWABanner() {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
 
   useEffect(() => {
-    // Don't show if already installed (running in standalone)
     if (window.matchMedia("(display-mode: standalone)").matches) return;
-    // Don't show if dismissed recently
     const dismissed = localStorage.getItem("pwa-banner-dismissed");
     if (dismissed && Date.now() - parseInt(dismissed) < 7 * 24 * 60 * 60 * 1000)
       return;
@@ -24,11 +22,8 @@ export function InstallPWABanner() {
     setIsIOS(ios);
     setIsAndroid(android);
 
-    if (ios) {
-      setShow(true);
-    }
+    if (ios) setShow(true);
 
-    // Android/Chrome install prompt
     window.addEventListener("beforeinstallprompt", (e) => {
       e.preventDefault();
       setDeferredPrompt(e);
@@ -63,12 +58,12 @@ export function InstallPWABanner() {
         {isIOS ? (
           <p className="text-xs text-gray-400 mt-0.5">
             Tap <Share size={11} className="inline mx-0.5" /> then{" "}
-            <strong>"Add to Home Screen"</strong> for the best experience — no
-            browser bar!
+            <strong>&ldquo;Add to Home Screen&rdquo;</strong> for the best
+            experience &mdash; no browser bar!
           </p>
         ) : (
           <p className="text-xs text-gray-400 mt-0.5">
-            Install the app for the best experience — no browser bar!
+            Install the app for the best experience &mdash; no browser bar!
           </p>
         )}
         {isAndroid && deferredPrompt && (
