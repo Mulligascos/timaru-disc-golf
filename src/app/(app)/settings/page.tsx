@@ -119,9 +119,18 @@ const SWATCHES = [
   "#0f172a",
 ];
 
+const HEX_RE = /^#[0-9a-fA-F]{6}$/;
+
 export default function SettingsPage() {
   const { settings, update } = useTheme();
   const [customColour, setCustomColour] = useState(settings.accentColour);
+
+  function applyCustom(value: string) {
+    setCustomColour(value);
+    if (HEX_RE.test(value)) {
+      update({ accentColour: value });
+    }
+  }
 
   return (
     <div className="space-y-8 max-w-lg">
@@ -237,47 +246,41 @@ export default function SettingsPage() {
         </div>
 
         {/* Custom colour picker */}
-        <div className="flex items-center gap-3 pt-1">
-          <div className="flex-1">
-            <label
-              className="block text-xs font-semibold mb-1.5"
-              style={{ color: "var(--text-secondary)" }}
+        <div>
+          <label
+            className="block text-xs font-semibold mb-1.5"
+            style={{ color: "var(--text-secondary)" }}
+          >
+            Custom colour
+          </label>
+          <div className="flex items-center gap-2">
+            <input
+              type="color"
+              value={customColour}
+              onChange={(e) => applyCustom(e.target.value)}
+              className="w-10 h-10 rounded-lg border cursor-pointer p-0.5 flex-shrink-0"
+              style={{ borderColor: "var(--border-colour)" }}
+            />
+            <input
+              type="text"
+              value={customColour}
+              onChange={(e) => applyCustom(e.target.value)}
+              placeholder="#22c55e"
+              maxLength={7}
+              className="flex-1 px-3 py-2 rounded-lg border text-sm font-mono focus:outline-none focus:ring-2"
+              style={{
+                background: "var(--bg-primary)",
+                borderColor: "var(--border-colour)",
+                color: "var(--text-primary)",
+              }}
+            />
+            <button
+              onClick={() => applyCustom(customColour)}
+              className="px-3 py-2 rounded-lg text-sm font-semibold text-white flex-shrink-0"
+              style={{ backgroundColor: "var(--accent-600)" }}
             >
-              Custom colour
-            </label>
-            <div className="flex items-center gap-2">
-              <input
-                type="color"
-                value={customColour}
-                onChange={(e) => setCustomColour(e.target.value)}
-                className="w-10 h-10 rounded-lg border cursor-pointer p-0.5"
-                style={{ borderColor: "var(--border-colour)" }}
-              />
-              <input
-                type="text"
-                value={customColour}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setCustomColour(val);
-                  if (/^#[0-9a-fA-F]{6}$/.test(val))
-                    update({ accentColour: val });
-                }}
-                placeholder="#22c55e"
-                className="flex-1 px-3 py-2 rounded-lg border text-sm font-mono focus:outline-none focus:ring-2"
-                style={{
-                  background: "var(--bg-primary)",
-                  borderColor: "var(--border-colour)",
-                  color: "var(--text-primary)",
-                }}
-              />
-              <button
-                onClick={() => update({ accentColour: customColour })}
-                className="px-3 py-2 rounded-lg text-sm font-semibold text-white transition-colors"
-                style={{ backgroundColor: "var(--accent-600)" }}
-              >
-                Apply
-              </button>
-            </div>
+              Apply
+            </button>
           </div>
         </div>
       </section>
@@ -317,7 +320,7 @@ export default function SettingsPage() {
             </div>
           </div>
           <button
-            className="w-full py-2.5 rounded-xl text-sm font-semibold text-white transition-colors"
+            className="w-full py-2.5 rounded-xl text-sm font-semibold text-white"
             style={{ backgroundColor: "var(--accent-600)" }}
           >
             Sample Button
@@ -334,7 +337,7 @@ export default function SettingsPage() {
           update({ mode: "light", accentColour: "#22c55e" });
           setCustomColour("#22c55e");
         }}
-        className="w-full py-3 rounded-xl border text-sm font-semibold transition-colors"
+        className="w-full py-3 rounded-xl border text-sm font-semibold"
         style={{
           borderColor: "var(--border-colour)",
           color: "var(--text-secondary)",
