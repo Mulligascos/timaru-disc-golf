@@ -97,13 +97,13 @@ function applyTheme(settings: ThemeSettings) {
     root.style.setProperty("--bg-card", "#111111");
     root.style.setProperty("--text-primary", "#f1f5f9");
     root.style.setProperty("--text-secondary", "#94a3b8");
-    root.style.setProperty("--border-colour", "#334155");
+    root.style.setProperty("--border-colour", "#222222");
   } else {
     root.style.setProperty("--bg-primary", "#f9fafb");
     root.style.setProperty("--bg-card", "#ffffff");
     root.style.setProperty("--text-primary", "#111827");
-    root.style.setProperty("--text-secondary", "#6b7280");
-    root.style.setProperty("--border-colour", "#e5e7eb");
+    root.style.setProperty("--text-secondary", "#373a41");
+    root.style.setProperty("--border-colour", "#b4b6b8");
   }
 }
 
