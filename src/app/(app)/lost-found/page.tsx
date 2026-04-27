@@ -1,14 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import Link from "next/link";
-import {
-  Disc,
-  Plus,
-  MapPin,
-  Calendar,
-  ChevronRight,
-  Search,
-} from "lucide-react";
+import { Disc, MapPin, Calendar } from "lucide-react";
 import { ReportDiscButton } from "@/components/lost-found/report-disc-button";
 import type { Metadata } from "next";
 
@@ -32,24 +24,20 @@ export default async function LostFoundPage() {
     .select("role")
     .eq("id", user.id)
     .single();
-
   const { data: courses } = await supabase
     .from("courses")
     .select("id, name")
     .eq("is_active", true);
-
   const { data: lostDiscs } = await supabase
     .from("lost_discs")
     .select("*, profiles(username, full_name), courses(name)")
     .neq("status", "reunited")
     .order("created_at", { ascending: false });
-
   const { data: foundDiscs } = await supabase
     .from("found_discs")
     .select("*, profiles(username, full_name), courses(name)")
     .neq("status", "reunited")
     .order("created_at", { ascending: false });
-
   const { data: reunitedDiscs } = await supabase
     .from("lost_discs")
     .select("*, profiles(username, full_name), courses(name)")
@@ -63,10 +51,18 @@ export default async function LostFoundPage() {
     const isOwn = disc.reported_by === user!.id;
 
     return (
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div
+        className="rounded-xl border overflow-hidden"
+        style={{
+          background: "var(--bg-card)",
+          borderColor: "var(--border-colour)",
+        }}
+      >
         <div className="flex gap-3 p-4">
-          {/* Photo or placeholder */}
-          <div className="w-16 h-16 rounded-xl bg-gray-100 flex-shrink-0 overflow-hidden flex items-center justify-center">
+          <div
+            className="w-16 h-16 rounded-xl flex-shrink-0 overflow-hidden flex items-center justify-center"
+            style={{ background: "var(--bg-primary)" }}
+          >
             {disc.photo_url ? (
               <img
                 src={disc.photo_url}
@@ -74,10 +70,9 @@ export default async function LostFoundPage() {
                 className="w-full h-full object-cover"
               />
             ) : (
-              <Disc size={24} className="text-gray-300" />
+              <Disc size={24} style={{ color: "var(--border-colour)" }} />
             )}
           </div>
-
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap mb-1">
               <span
@@ -86,25 +81,34 @@ export default async function LostFoundPage() {
                 {disc.status.charAt(0).toUpperCase() + disc.status.slice(1)}
               </span>
               {isOwn && (
-                <span className="text-xs text-green-600 font-medium">
+                <span
+                  className="text-xs font-medium"
+                  style={{ color: "var(--accent-600)" }}
+                >
                   Your report
                 </span>
               )}
             </div>
-
-            <p className="font-semibold text-gray-900 text-sm">
+            <p
+              className="font-semibold text-sm"
+              style={{ color: "var(--text-primary)" }}
+            >
               {[disc.disc_brand, disc.disc_mold, disc.disc_colour]
                 .filter(Boolean)
                 .join(" · ") || "Unknown disc"}
             </p>
-
             {disc.markings && (
-              <p className="text-xs text-gray-500 mt-0.5">
+              <p
+                className="text-xs mt-0.5"
+                style={{ color: "var(--text-secondary)" }}
+              >
                 Markings: {disc.markings}
               </p>
             )}
-
-            <div className="flex items-center gap-3 mt-1.5 text-xs text-gray-400 flex-wrap">
+            <div
+              className="flex items-center gap-3 mt-1.5 text-xs flex-wrap"
+              style={{ color: "var(--text-secondary)" }}
+            >
               {disc.courses?.name && (
                 <span className="flex items-center gap-1">
                   <MapPin size={10} /> {disc.courses.name}
@@ -121,23 +125,55 @@ export default async function LostFoundPage() {
                 </span>
               )}
             </div>
-
-            <p className="text-xs text-gray-400 mt-1">Reported by {name}</p>
+            <p
+              className="text-xs mt-1"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              Reported by {name}
+            </p>
           </div>
         </div>
-
-        {/* Contact / actions */}
         {type === "found" && (
           <div
-            className={`border-t border-gray-100 px-4 py-2.5 flex items-center justify-between`}
+            className="border-t px-4 py-2.5 flex items-center justify-between"
+            style={{ borderColor: "var(--border-colour)" }}
           >
-            <p className="text-xs text-gray-500">Is this your disc?</p>
-            <ContactButton disc={disc} reportedBy={disc.profiles} />
+            <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
+              Is this your disc?
+            </p>
+            <a
+              href={`mailto:?subject=Found disc at ${disc.courses?.name ?? "the course"}`}
+              className="text-xs font-semibold text-blue-600 hover:text-blue-700"
+            >
+              Contact{" "}
+              {disc.profiles?.full_name ?? disc.profiles?.username ?? "finder"}{" "}
+              →
+            </a>
           </div>
         )}
         {type === "lost" && (profile as any)?.role === "admin" && (
-          <div className="border-t border-gray-100 px-4 py-2.5">
-            <MarkReunitedButton discId={disc.id} type="lost" />
+          <div
+            className="border-t px-4 py-2.5"
+            style={{ borderColor: "var(--border-colour)" }}
+          >
+            <form
+              action={async () => {
+                "use server";
+                const { createClient } = await import("@/lib/supabase/server");
+                const supabase = await createClient();
+                await (supabase as any)
+                  .from("lost_discs")
+                  .update({ status: "reunited" })
+                  .eq("id", disc.id);
+              }}
+            >
+              <button
+                type="submit"
+                className="text-xs text-green-600 font-semibold hover:text-green-700"
+              >
+                ✓ Mark as reunited
+              </button>
+            </form>
           </div>
         )}
       </div>
@@ -148,18 +184,28 @@ export default async function LostFoundPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Lost & Found</h1>
-          <p className="text-gray-500 text-sm mt-1">
+          <h1
+            className="text-2xl font-bold"
+            style={{ color: "var(--text-primary)" }}
+          >
+            Lost & Found
+          </h1>
+          <p
+            className="text-sm mt-1"
+            style={{ color: "var(--text-secondary)" }}
+          >
             {lostDiscs?.length ?? 0} lost · {foundDiscs?.length ?? 0} found
           </p>
         </div>
         <ReportDiscButton userId={user.id} courses={courses ?? []} />
       </div>
 
-      {/* Found discs */}
       {foundDiscs && foundDiscs.length > 0 && (
         <section>
-          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+          <h2
+            className="text-xs font-semibold uppercase tracking-wide mb-3"
+            style={{ color: "var(--text-secondary)" }}
+          >
             Found Discs 🔵
           </h2>
           <div className="space-y-3">
@@ -170,10 +216,12 @@ export default async function LostFoundPage() {
         </section>
       )}
 
-      {/* Lost discs */}
       {lostDiscs && lostDiscs.length > 0 && (
         <section>
-          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+          <h2
+            className="text-xs font-semibold uppercase tracking-wide mb-3"
+            style={{ color: "var(--text-secondary)" }}
+          >
             Lost Discs 🔴
           </h2>
           <div className="space-y-3">
@@ -184,10 +232,12 @@ export default async function LostFoundPage() {
         </section>
       )}
 
-      {/* Recently reunited */}
       {reunitedDiscs && reunitedDiscs.length > 0 && (
         <section>
-          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+          <h2
+            className="text-xs font-semibold uppercase tracking-wide mb-3"
+            style={{ color: "var(--text-secondary)" }}
+          >
             Recently Reunited ✅
           </h2>
           <div className="space-y-3">
@@ -201,57 +251,25 @@ export default async function LostFoundPage() {
       {(!lostDiscs || lostDiscs.length === 0) &&
         (!foundDiscs || foundDiscs.length === 0) && (
           <div className="text-center py-16">
-            <Disc size={48} className="mx-auto text-gray-300 mb-4" />
-            <p className="font-semibold text-gray-600">
+            <Disc
+              size={48}
+              className="mx-auto mb-4"
+              style={{ color: "var(--border-colour)" }}
+            />
+            <p
+              className="font-semibold"
+              style={{ color: "var(--text-secondary)" }}
+            >
               No lost or found discs
             </p>
-            <p className="text-sm text-gray-400 mt-1">
+            <p
+              className="text-sm mt-1"
+              style={{ color: "var(--text-secondary)" }}
+            >
               Lost a disc? Report it here and the club can help.
             </p>
           </div>
         )}
     </div>
-  );
-}
-
-function ContactButton({ disc, reportedBy }: { disc: any; reportedBy: any }) {
-  const name = reportedBy?.full_name ?? reportedBy?.username ?? "the finder";
-  return (
-    <a
-      href={`mailto:?subject=Found disc at ${disc.courses?.name ?? "the course"}`}
-      className="text-xs text-blue-600 font-semibold hover:text-blue-700"
-    >
-      Contact {name} →
-    </a>
-  );
-}
-
-function MarkReunitedButton({
-  discId,
-  type,
-}: {
-  discId: string;
-  type: "lost" | "found";
-}) {
-  return (
-    <form
-      action={async () => {
-        "use server";
-        const { createClient } = await import("@/lib/supabase/server");
-        const supabase = await createClient();
-        const table = type === "lost" ? "lost_discs" : "found_discs";
-        await (supabase as any)
-          .from(table)
-          .update({ status: "reunited" })
-          .eq("id", discId);
-      }}
-    >
-      <button
-        type="submit"
-        className="text-xs text-green-600 font-semibold hover:text-green-700"
-      >
-        ✓ Mark as reunited
-      </button>
-    </form>
   );
 }

@@ -14,7 +14,6 @@ interface BingoSquare {
   description: string | null;
   is_free_space: boolean;
 }
-
 interface BingoCardProps {
   squares: BingoSquare[];
   completedIds: Set<string>;
@@ -26,12 +25,9 @@ interface BingoCardProps {
 
 function getSquareDef(label: string) {
   const autoKeyMatch = label.match(/^\[([^\]]+)\]/);
-  if (autoKeyMatch) {
-    const def = BINGO_SQUARES.find((s) => s.autoKey === autoKeyMatch[1]);
-    return def ?? null;
-  }
-  const def = BINGO_SQUARES.find((s) => s.label === label);
-  return def ?? null;
+  if (autoKeyMatch)
+    return BINGO_SQUARES.find((s) => s.autoKey === autoKeyMatch[1]) ?? null;
+  return BINGO_SQUARES.find((s) => s.label === label) ?? null;
 }
 
 function cleanLabel(label: string) {
@@ -56,24 +52,19 @@ export function BingoCard({
   );
   const [marking, setMarking] = useState(false);
 
-  // Sort squares into 3-col grid order
   const grid: (BingoSquare | null)[][] = Array.from({ length: 8 }, () =>
     Array(3).fill(null),
   );
   for (const sq of squares) {
-    if (sq.row_index < 8 && sq.col_index < 3) {
+    if (sq.row_index < 8 && sq.col_index < 3)
       grid[sq.row_index][sq.col_index] = sq;
-    }
   }
 
   async function toggleSquare(sq: BingoSquare) {
     const def = getSquareDef(sq.label);
-    const isAuto = def?.autoDetect ?? false;
-    if (isAuto) return; // auto squares can't be manually toggled
-
+    if (def?.autoDetect) return;
     setMarking(true);
     const isCompleted = completed.has(sq.id);
-
     if (isCompleted) {
       await (supabase as any)
         .from("member_bingo_progress")
@@ -91,7 +82,6 @@ export function BingoCard({
         .insert({ member_id: userId, card_id: cardId, square_id: sq.id });
       setCompleted((prev) => new Set([...prev, sq.id]));
     }
-
     setMarking(false);
     setSelectedSquare(null);
     router.refresh();
@@ -107,17 +97,19 @@ export function BingoCard({
 
   return (
     <>
-      {/* 3×8 grid */}
       <div className="grid grid-cols-3 gap-2">
         {grid.flat().map((sq, i) => {
           if (!sq)
             return (
               <div
                 key={i}
-                className="aspect-square bg-gray-50 rounded-xl border border-dashed border-gray-200"
+                className="aspect-square rounded-xl border border-dashed"
+                style={{
+                  background: "var(--bg-primary)",
+                  borderColor: "var(--border-colour)",
+                }}
               />
             );
-
           const isCompleted = completed.has(sq.id);
           const def = getSquareDef(sq.label);
           const isAuto = def?.autoDetect ?? false;
@@ -130,15 +122,21 @@ export function BingoCard({
               className={`relative aspect-square rounded-xl border-2 flex flex-col items-center justify-center p-2 gap-1 transition-all active:scale-95 ${
                 isCompleted
                   ? "bg-green-500 border-green-400 text-white shadow-md"
-                  : "bg-white border-gray-200 hover:border-gray-300 text-gray-700"
+                  : "border-2"
               }`}
+              style={
+                !isCompleted
+                  ? {
+                      background: "var(--bg-card)",
+                      borderColor: "var(--border-colour)",
+                      color: "var(--text-primary)",
+                    }
+                  : undefined
+              }
             >
-              {/* Auto badge */}
               {isAuto && (
                 <div
-                  className={`absolute top-1 right-1 w-4 h-4 rounded-full flex items-center justify-center ${
-                    isCompleted ? "bg-green-400" : "bg-blue-100"
-                  }`}
+                  className={`absolute top-1 right-1 w-4 h-4 rounded-full flex items-center justify-center ${isCompleted ? "bg-green-400" : "bg-blue-100"}`}
                 >
                   <Zap
                     size={9}
@@ -146,8 +144,6 @@ export function BingoCard({
                   />
                 </div>
               )}
-
-              {/* Completed check */}
               {isCompleted && (
                 <div className="absolute inset-0 flex items-center justify-center">
                   <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
@@ -155,13 +151,13 @@ export function BingoCard({
                   </div>
                 </div>
               )}
-
               <span className="text-xl leading-none">{def?.icon ?? "🎯"}</span>
               <span
-                className={`text-center font-semibold leading-tight ${
-                  isCompleted ? "text-white text-opacity-90" : "text-gray-700"
-                }`}
-                style={{ fontSize: "9px" }}
+                className={`text-center font-semibold leading-tight ${isCompleted ? "text-white" : ""}`}
+                style={{
+                  fontSize: "9px",
+                  color: isCompleted ? undefined : "var(--text-primary)",
+                }}
               >
                 {label}
               </span>
@@ -171,7 +167,10 @@ export function BingoCard({
       </div>
 
       {/* Legend */}
-      <div className="flex items-center gap-4 text-xs text-gray-500">
+      <div
+        className="flex items-center gap-4 text-xs"
+        style={{ color: "var(--text-secondary)" }}
+      >
         <span className="flex items-center gap-1">
           <div className="w-4 h-4 bg-blue-100 rounded-full flex items-center justify-center">
             <Zap size={9} className="text-blue-500" />
@@ -193,27 +192,39 @@ export function BingoCard({
             className="absolute inset-0 bg-black/50"
             onClick={() => setSelectedSquare(null)}
           />
-          <div className="relative bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-sm p-6">
+          <div
+            className="relative rounded-t-2xl sm:rounded-2xl w-full sm:max-w-sm p-6"
+            style={{
+              background: "var(--bg-card)",
+              color: "var(--text-primary)",
+            }}
+          >
             <button
               onClick={() => setSelectedSquare(null)}
-              className="absolute top-4 right-4 p-1.5 hover:bg-gray-100 rounded-lg"
+              className="absolute top-4 right-4 p-1.5 rounded-lg hover:opacity-70"
+              style={{ color: "var(--text-secondary)" }}
             >
               <X size={18} />
             </button>
-
             <div className="text-center mb-5">
               <span className="text-5xl">{selectedDef?.icon ?? "🎯"}</span>
-              <h2 className="text-lg font-bold text-gray-900 mt-3">
+              <h2
+                className="text-lg font-bold mt-3"
+                style={{ color: "var(--text-primary)" }}
+              >
                 {cleanLabel(selectedSquare.label)}
               </h2>
-              <p className="text-gray-500 text-sm mt-2 leading-relaxed">
+              <p
+                className="text-sm mt-2 leading-relaxed"
+                style={{ color: "var(--text-secondary)" }}
+              >
                 {selectedSquare.description ??
                   selectedDef?.description ??
                   "Complete this activity to mark it off."}
               </p>
             </div>
 
-            {isAutoSquare ? (
+            {isAutoSquare && (
               <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-xl p-3 text-sm text-blue-700 mb-4">
                 <Zap size={16} className="flex-shrink-0" />
                 <span>
@@ -221,15 +232,13 @@ export function BingoCard({
                   your scoring history.
                 </span>
               </div>
-            ) : null}
-
-            {selectedCompleted ? (
+            )}
+            {selectedCompleted && (
               <div className="flex items-center justify-center gap-2 bg-green-50 border border-green-200 rounded-xl p-3 text-sm text-green-700 mb-4">
                 <Check size={16} />
                 <span className="font-semibold">Completed!</span>
               </div>
-            ) : null}
-
+            )}
             {!isAutoSquare && (
               <button
                 onClick={() => toggleSquare(selectedSquare)}
@@ -247,9 +256,15 @@ export function BingoCard({
                     : "✓ Mark as complete"}
               </button>
             )}
-
             {isAutoSquare && !selectedCompleted && (
-              <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm text-gray-500">
+              <div
+                className="flex items-center gap-2 rounded-xl p-3 text-sm border"
+                style={{
+                  background: "var(--bg-primary)",
+                  borderColor: "var(--border-colour)",
+                  color: "var(--text-secondary)",
+                }}
+              >
                 <Lock size={14} className="flex-shrink-0" />
                 <span>
                   Complete the activity in-game and this will update

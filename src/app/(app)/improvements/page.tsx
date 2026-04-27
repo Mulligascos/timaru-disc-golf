@@ -27,12 +27,10 @@ export default async function ImprovementsPage() {
     .eq("id", user.id)
     .single();
   const isAdmin = (profile as any)?.role === "admin";
-
   const { data: courses } = await supabase
     .from("courses")
     .select("id, name")
     .eq("is_active", true);
-
   const { data: requests } = await supabase
     .from("improvement_requests")
     .select(
@@ -45,8 +43,16 @@ export default async function ImprovementsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Improvements</h1>
-          <p className="text-gray-500 text-sm mt-1">
+          <h1
+            className="text-2xl font-bold"
+            style={{ color: "var(--text-primary)" }}
+          >
+            Improvements
+          </h1>
+          <p
+            className="text-sm mt-1"
+            style={{ color: "var(--text-secondary)" }}
+          >
             Suggest and vote on course improvements
           </p>
         </div>
@@ -62,11 +68,21 @@ export default async function ImprovementsPage() {
             );
             const submitter =
               r.profiles?.full_name ?? r.profiles?.username ?? "Unknown";
+            const next =
+              r.status === "open"
+                ? "in_review"
+                : r.status === "in_review"
+                  ? "resolved"
+                  : null;
 
             return (
               <div
                 key={r.id}
-                className="bg-white rounded-2xl border border-gray-200 overflow-hidden"
+                className="rounded-2xl border overflow-hidden"
+                style={{
+                  background: "var(--bg-card)",
+                  borderColor: "var(--border-colour)",
+                }}
               >
                 {r.photo_url && (
                   <img
@@ -77,7 +93,6 @@ export default async function ImprovementsPage() {
                 )}
                 <div className="p-4 space-y-3">
                   <div className="flex items-start gap-3">
-                    {/* Upvote */}
                     <UpvoteButton
                       requestId={r.id}
                       userId={user.id}
@@ -86,7 +101,10 @@ export default async function ImprovementsPage() {
                     />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap mb-1">
-                        <h3 className="font-bold text-gray-900 text-sm">
+                        <h3
+                          className="font-bold text-sm"
+                          style={{ color: "var(--text-primary)" }}
+                        >
                           {r.title}
                         </h3>
                         <span
@@ -95,10 +113,16 @@ export default async function ImprovementsPage() {
                           {sta.label}
                         </span>
                       </div>
-                      <p className="text-sm text-gray-600 leading-relaxed">
+                      <p
+                        className="text-sm leading-relaxed"
+                        style={{ color: "var(--text-secondary)" }}
+                      >
                         {r.description}
                       </p>
-                      <div className="text-xs text-gray-400 mt-2 space-y-0.5">
+                      <div
+                        className="text-xs mt-2 space-y-0.5"
+                        style={{ color: "var(--text-secondary)" }}
+                      >
                         {r.courses?.name && <p>📍 {r.courses.name}</p>}
                         <p>
                           By {submitter} ·{" "}
@@ -113,19 +137,47 @@ export default async function ImprovementsPage() {
                   </div>
 
                   {r.admin_notes && (
-                    <div className="bg-green-50 rounded-xl p-3 text-xs text-green-700">
+                    <div
+                      className="rounded-xl p-3 text-xs"
+                      style={{
+                        background: "var(--accent-50)",
+                        color: "var(--accent-700)",
+                      }}
+                    >
                       <span className="font-semibold">Admin note: </span>
                       {r.admin_notes}
                     </div>
                   )}
 
                   {isAdmin &&
+                    next &&
                     r.status !== "resolved" &&
                     r.status !== "closed" && (
-                      <AdminImprovementActions
-                        requestId={r.id}
-                        currentStatus={r.status}
-                      />
+                      <form
+                        action={async () => {
+                          "use server";
+                          const { createClient } =
+                            await import("@/lib/supabase/server");
+                          const supabase = await createClient();
+                          await (supabase as any)
+                            .from("improvement_requests")
+                            .update({
+                              status: next,
+                              ...(next === "resolved"
+                                ? { resolved_at: new Date().toISOString() }
+                                : {}),
+                            })
+                            .eq("id", r.id);
+                        }}
+                      >
+                        <button
+                          type="submit"
+                          className="text-xs font-semibold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors"
+                        >
+                          → Mark as{" "}
+                          {next === "in_review" ? "In Review" : "Done"}
+                        </button>
+                      </form>
                     )}
                 </div>
               </div>
@@ -134,55 +186,25 @@ export default async function ImprovementsPage() {
         </div>
       ) : (
         <div className="text-center py-16">
-          <Lightbulb size={48} className="mx-auto text-gray-300 mb-4" />
-          <p className="font-semibold text-gray-600">No suggestions yet</p>
-          <p className="text-sm text-gray-400 mt-1">
+          <Lightbulb
+            size={48}
+            className="mx-auto mb-4"
+            style={{ color: "var(--border-colour)" }}
+          />
+          <p
+            className="font-semibold"
+            style={{ color: "var(--text-secondary)" }}
+          >
+            No suggestions yet
+          </p>
+          <p
+            className="text-sm mt-1"
+            style={{ color: "var(--text-secondary)" }}
+          >
             Have an idea to improve the course? Share it here.
           </p>
         </div>
       )}
     </div>
-  );
-}
-
-function AdminImprovementActions({
-  requestId,
-  currentStatus,
-}: {
-  requestId: string;
-  currentStatus: string;
-}) {
-  const next =
-    currentStatus === "open"
-      ? "in_review"
-      : currentStatus === "in_review"
-        ? "resolved"
-        : null;
-  if (!next) return null;
-
-  return (
-    <form
-      action={async () => {
-        "use server";
-        const { createClient } = await import("@/lib/supabase/server");
-        const supabase = await createClient();
-        await (supabase as any)
-          .from("improvement_requests")
-          .update({
-            status: next,
-            ...(next === "resolved"
-              ? { resolved_at: new Date().toISOString() }
-              : {}),
-          })
-          .eq("id", requestId);
-      }}
-    >
-      <button
-        type="submit"
-        className="text-xs font-semibold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors"
-      >
-        → Mark as {next === "in_review" ? "In Review" : "Done"}
-      </button>
-    </form>
   );
 }

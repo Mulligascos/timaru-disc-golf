@@ -31,24 +31,19 @@ export function ProfileForm({ profile, userId, email }: ProfileFormProps) {
   async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-
     setUploading(true);
     setError("");
-
     const fileExt = file.name.split(".").pop();
     const filePath = `${userId}/avatar.${fileExt}`;
-
     const { error: uploadError } = await (supabase as any).storage
       .from("avatars")
       .upload(filePath, file, { upsert: true });
-
     if (uploadError) {
       setError("Failed to upload avatar: " + uploadError.message);
     } else {
       const { data } = supabase.storage.from("avatars").getPublicUrl(filePath);
       setAvatarUrl(data.publicUrl + "?t=" + Date.now());
     }
-
     setUploading(false);
   }
 
@@ -56,7 +51,6 @@ export function ProfileForm({ profile, userId, email }: ProfileFormProps) {
     setSaving(true);
     setError("");
     setMessage("");
-
     const { error } = await (supabase as any)
       .from("profiles")
       .update({
@@ -68,7 +62,6 @@ export function ProfileForm({ profile, userId, email }: ProfileFormProps) {
         avatar_url: avatarUrl || null,
       })
       .eq("id", userId);
-
     if (error) {
       setError(error.message);
     } else {
@@ -76,7 +69,6 @@ export function ProfileForm({ profile, userId, email }: ProfileFormProps) {
       router.refresh();
       setTimeout(() => setMessage(""), 3000);
     }
-
     setSaving(false);
   }
 
@@ -89,9 +81,18 @@ export function ProfileForm({ profile, userId, email }: ProfileFormProps) {
         .slice(0, 2)
     : (username?.charAt(0)?.toUpperCase() ?? "U");
 
+  const inputClass =
+    "w-full px-3 py-2.5 rounded-lg border text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent";
+
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-      {/* Avatar section */}
+    <div
+      className="rounded-2xl border overflow-hidden"
+      style={{
+        background: "var(--bg-card)",
+        borderColor: "var(--border-colour)",
+      }}
+    >
+      {/* Avatar section — always dark */}
       <div className="bg-gradient-to-br from-gray-900 to-gray-800 px-6 py-8 flex flex-col items-center gap-4">
         <div className="relative">
           <div className="w-24 h-24 rounded-full overflow-hidden bg-green-500 flex items-center justify-center ring-4 ring-white/20">
@@ -120,18 +121,15 @@ export function ProfileForm({ profile, userId, email }: ProfileFormProps) {
             onChange={handleAvatarUpload}
           />
         </div>
-
         <div className="text-center">
           <p className="text-white font-semibold">{fullName || username}</p>
           <p className="text-gray-400 text-sm">{email}</p>
           {profile?.bag_tags?.tag_number && (
             <div className="mt-2 inline-flex items-center gap-1.5 bg-green-500/20 text-green-400 px-3 py-1 rounded-full text-sm font-medium">
-              <Tag size={12} />
-              Bag Tag #{profile.bag_tags.tag_number}
+              <Tag size={12} /> Bag Tag #{profile.bag_tags.tag_number}
             </div>
           )}
         </div>
-
         {uploading && (
           <p className="text-green-400 text-xs">Uploading photo...</p>
         )}
@@ -141,65 +139,105 @@ export function ProfileForm({ profile, userId, email }: ProfileFormProps) {
       <div className="p-6 space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
+            <label
+              className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide mb-1.5"
+              style={{ color: "var(--text-secondary)" }}
+            >
               <User size={12} /> Full Name
             </label>
             <input
               type="text"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
-              className="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              className={inputClass}
               placeholder="Your full name"
+              style={{
+                background: "var(--bg-primary)",
+                borderColor: "var(--border-colour)",
+                color: "var(--text-primary)",
+              }}
             />
           </div>
           <div>
-            <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
+            <label
+              className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide mb-1.5"
+              style={{ color: "var(--text-secondary)" }}
+            >
               <Hash size={12} /> Username
             </label>
             <input
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              className={inputClass}
               placeholder="username"
+              style={{
+                background: "var(--bg-primary)",
+                borderColor: "var(--border-colour)",
+                color: "var(--text-primary)",
+              }}
             />
           </div>
           <div>
-            <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
+            <label
+              className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide mb-1.5"
+              style={{ color: "var(--text-secondary)" }}
+            >
               <Tag size={12} /> PDGA Number
             </label>
             <input
               type="text"
               value={pdgaNumber}
               onChange={(e) => setPdgaNumber(e.target.value)}
-              className="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              className={inputClass}
               placeholder="e.g. 123456"
+              style={{
+                background: "var(--bg-primary)",
+                borderColor: "var(--border-colour)",
+                color: "var(--text-primary)",
+              }}
             />
           </div>
           <div>
-            <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
+            <label
+              className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide mb-1.5"
+              style={{ color: "var(--text-secondary)" }}
+            >
               <Phone size={12} /> Phone
             </label>
             <input
               type="tel"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              className="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              className={inputClass}
               placeholder="e.g. 021 123 4567"
+              style={{
+                background: "var(--bg-primary)",
+                borderColor: "var(--border-colour)",
+                color: "var(--text-primary)",
+              }}
             />
           </div>
         </div>
 
         <div>
-          <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
+          <label
+            className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide mb-1.5"
+            style={{ color: "var(--text-secondary)" }}
+          >
             <FileText size={12} /> Bio
           </label>
           <textarea
             value={bio}
             onChange={(e) => setBio(e.target.value)}
             rows={3}
-            className="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none"
+            className={`${inputClass} resize-none`}
             placeholder="Tell the club a bit about yourself..."
+            style={{
+              background: "var(--bg-primary)",
+              borderColor: "var(--border-colour)",
+              color: "var(--text-primary)",
+            }}
           />
         </div>
 

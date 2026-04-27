@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { Tag, History, Trophy, Medal } from "lucide-react";
+import { Tag, Trophy, Medal } from "lucide-react";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = { title: "Bag Tags" };
@@ -12,6 +12,7 @@ export default async function BagTagsPage() {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+
   const currentSeason = new Date().getFullYear().toString();
   const [{ data: profile }, { data: tags }, { data: history }] =
     await Promise.all([
@@ -22,7 +23,9 @@ export default async function BagTagsPage() {
         .single(),
       supabase
         .from("bag_tags")
-        .select("*, profiles(id, username, full_name, avatar_url)")
+        .select(
+          "*, holder:profiles!bag_tags_holder_id_fkey(id, username, full_name, avatar_url)",
+        )
         .eq("is_active", true)
         .eq("season", currentSeason)
         .order("tag_number", { ascending: true }),
@@ -43,8 +46,13 @@ export default async function BagTagsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Bag Tags</h1>
-        <p className="text-gray-500 text-sm mt-1">
+        <h1
+          className="text-2xl font-bold"
+          style={{ color: "var(--text-primary)" }}
+        >
+          Bag Tags
+        </h1>
+        <p className="text-sm mt-1" style={{ color: "var(--text-secondary)" }}>
           {currentSeason} Season · {claimed.length} active · {unclaimed.length}{" "}
           available
         </p>
@@ -96,58 +104,110 @@ export default async function BagTagsPage() {
           </div>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-dashed border-gray-300 p-6 text-center">
-          <Tag size={32} className="mx-auto text-gray-300 mb-2" />
-          <p className="font-semibold text-gray-600 text-sm">
+        <div
+          className="rounded-2xl border border-dashed p-6 text-center"
+          style={{
+            background: "var(--bg-card)",
+            borderColor: "var(--border-colour)",
+          }}
+        >
+          <Tag
+            size={32}
+            className="mx-auto mb-2"
+            style={{ color: "var(--border-colour)" }}
+          />
+          <p
+            className="font-semibold text-sm"
+            style={{ color: "var(--text-secondary)" }}
+          >
             No tag assigned yet
           </p>
-          <p className="text-xs text-gray-400 mt-1">
+          <p
+            className="text-xs mt-1"
+            style={{ color: "var(--text-secondary)" }}
+          >
             Contact your admin to get a bag tag for this season.
           </p>
         </div>
       )}
 
       {/* How tags work */}
-      <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 text-sm text-blue-800 space-y-1">
+      <div
+        className="rounded-2xl p-4 text-sm space-y-1"
+        style={{
+          background: "var(--accent-50)",
+          border: "1px solid var(--accent-200)",
+          color: "var(--accent-700)",
+        }}
+      >
         <p className="font-semibold">How Bag Tags Work</p>
         <p>
           Tags are played for in every round. At the end of each round, tag
           holders are ranked by score — lowest score earns the lowest tag
           number.
         </p>
-        <p className="text-xs text-blue-600 mt-1">
+        <p className="text-xs mt-1" style={{ color: "var(--accent-600)" }}>
           Season runs October 1st → September 30th each year.
         </p>
       </div>
 
       {/* Leaderboard */}
       <section>
-        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
+        <h2
+          className="text-sm font-semibold uppercase tracking-wide mb-3"
+          style={{ color: "var(--text-secondary)" }}
+        >
           Current Leaderboard
         </h2>
         {claimed.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-gray-200 p-8 text-center">
-            <Tag size={40} className="mx-auto text-gray-300 mb-3" />
-            <p className="font-semibold text-gray-600">No tags assigned yet</p>
-            <p className="text-sm text-gray-400 mt-1">
+          <div
+            className="rounded-2xl border p-8 text-center"
+            style={{
+              background: "var(--bg-card)",
+              borderColor: "var(--border-colour)",
+            }}
+          >
+            <Tag
+              size={40}
+              className="mx-auto mb-3"
+              style={{ color: "var(--border-colour)" }}
+            />
+            <p
+              className="font-semibold"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              No tags assigned yet
+            </p>
+            <p
+              className="text-sm mt-1"
+              style={{ color: "var(--text-secondary)" }}
+            >
               Admin assigns tags to members.
             </p>
           </div>
         ) : (
-          <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-            <div className="divide-y divide-gray-100">
+          <div
+            className="rounded-2xl border overflow-hidden"
+            style={{
+              background: "var(--bg-card)",
+              borderColor: "var(--border-colour)",
+            }}
+          >
+            <div style={{ borderColor: "var(--border-colour)" }}>
               {claimed.map((tag: any, i: number) => {
                 const isMe = tag.holder_id === user.id;
                 const name =
                   tag.holder?.full_name ?? tag.holder?.username ?? "Unknown";
                 const initials = name.charAt(0).toUpperCase();
-
                 return (
                   <div
                     key={tag.id}
-                    className={`flex items-center gap-3 px-4 py-3 ${isMe ? "bg-green-50" : ""}`}
+                    className="flex items-center gap-3 px-4 py-3 border-b last:border-0"
+                    style={{
+                      borderColor: "var(--border-colour)",
+                      background: isMe ? "var(--accent-50)" : undefined,
+                    }}
                   >
-                    {/* Position icon */}
                     <div className="w-7 flex items-center justify-center flex-shrink-0">
                       {i === 0 ? (
                         <Trophy size={16} className="text-yellow-500" />
@@ -156,13 +216,14 @@ export default async function BagTagsPage() {
                       ) : i === 2 ? (
                         <Medal size={16} className="text-amber-600" />
                       ) : (
-                        <span className="text-xs font-bold text-gray-400">
+                        <span
+                          className="text-xs font-bold"
+                          style={{ color: "var(--text-secondary)" }}
+                        >
                           {i + 1}
                         </span>
                       )}
                     </div>
-
-                    {/* Tag badge */}
                     <div
                       className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 font-black text-sm ${
                         i === 0
@@ -178,15 +239,13 @@ export default async function BagTagsPage() {
                     >
                       #{tag.tag_number}
                     </div>
-
-                    {/* Avatar + name */}
                     <div className="flex items-center gap-2 flex-1 min-w-0">
                       <div
                         className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0 ${isMe ? "bg-green-500" : "bg-gray-400"}`}
                       >
-                        {tag.profiles?.avatar_url ? (
+                        {tag.holder?.avatar_url ? (
                           <img
-                            src={tag.profiles.avatar_url}
+                            src={tag.holder.avatar_url}
                             className="w-full h-full rounded-full object-cover"
                             alt=""
                           />
@@ -195,11 +254,19 @@ export default async function BagTagsPage() {
                         )}
                       </div>
                       <p
-                        className={`text-sm font-semibold truncate ${isMe ? "text-green-700" : "text-gray-900"}`}
+                        className="text-sm font-semibold truncate"
+                        style={{
+                          color: isMe
+                            ? "var(--accent-600)"
+                            : "var(--text-primary)",
+                        }}
                       >
                         {name}
                         {isMe && (
-                          <span className="text-green-500 text-xs ml-1">
+                          <span
+                            className="text-xs ml-1"
+                            style={{ color: "var(--accent-500)" }}
+                          >
                             (you)
                           </span>
                         )}
@@ -209,11 +276,18 @@ export default async function BagTagsPage() {
                 );
               })}
             </div>
-
-            {/* Unclaimed tags */}
             {unclaimed.length > 0 && (
-              <div className="border-t border-gray-100 px-4 py-3 bg-gray-50">
-                <p className="text-xs text-gray-400 font-medium">
+              <div
+                className="px-4 py-3 border-t"
+                style={{
+                  borderColor: "var(--border-colour)",
+                  background: "var(--bg-primary)",
+                }}
+              >
+                <p
+                  className="text-xs font-medium"
+                  style={{ color: "var(--text-secondary)" }}
+                >
                   {unclaimed.length} unassigned tag
                   {unclaimed.length > 1 ? "s" : ""}:{" "}
                   {unclaimed
@@ -231,40 +305,53 @@ export default async function BagTagsPage() {
       {/* Recent transfers */}
       {history && (history as any[]).length > 0 && (
         <section>
-          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
+          <h2
+            className="text-sm font-semibold uppercase tracking-wide mb-3"
+            style={{ color: "var(--text-secondary)" }}
+          >
             Recent Tag Transfers
           </h2>
           <div className="space-y-2">
             {(history as any[]).map((h: any) => (
               <div
                 key={h.id}
-                className="bg-white rounded-xl border border-gray-200 p-3 flex items-center gap-3"
+                className="rounded-xl border p-3 flex items-center gap-3"
+                style={{
+                  background: "var(--bg-card)",
+                  borderColor: "var(--border-colour)",
+                }}
               >
                 <div className="w-9 h-9 rounded-xl bg-orange-100 flex items-center justify-center flex-shrink-0">
                   <span className="text-xs font-black text-orange-700">
                     #{h.bag_tags?.tag_number}
                   </span>
                 </div>
-                <div className="flex-1 min-w-0 text-xs text-gray-600">
+                <div
+                  className="flex-1 min-w-0 text-xs"
+                  style={{ color: "var(--text-secondary)" }}
+                >
                   {h.from_profile ? (
                     <span>
-                      <strong>
+                      <strong style={{ color: "var(--text-primary)" }}>
                         {h.to_profile?.full_name ?? h.to_profile?.username}
                       </strong>{" "}
                       took tag from{" "}
-                      <strong>
+                      <strong style={{ color: "var(--text-primary)" }}>
                         {h.from_profile?.full_name ?? h.from_profile?.username}
                       </strong>
                     </span>
                   ) : (
                     <span>
                       Tag assigned to{" "}
-                      <strong>
+                      <strong style={{ color: "var(--text-primary)" }}>
                         {h.to_profile?.full_name ?? h.to_profile?.username}
                       </strong>
                     </span>
                   )}
-                  <p className="text-gray-400 mt-0.5">
+                  <p
+                    className="mt-0.5"
+                    style={{ color: "var(--text-secondary)" }}
+                  >
                     {new Date(h.transferred_at).toLocaleDateString("en-NZ", {
                       day: "numeric",
                       month: "short",
