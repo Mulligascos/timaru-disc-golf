@@ -1,15 +1,11 @@
 import { AuthForm } from "@/components/auth/auth-form";
 
-export default function LoginPage({
+export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: { redirectTo?: string; error?: string };
+  searchParams: Promise<{ redirectTo?: string; error?: string }>;
 }) {
-  return (
-    <AuthForm
-      mode="login"
-      redirectTo={searchParams.redirectTo}
-      error={searchParams.error}
-    />
-  );
+  const { redirectTo, error } = await searchParams;
+
+  return <AuthForm mode="login" redirectTo={redirectTo} error={error} />;
 }
