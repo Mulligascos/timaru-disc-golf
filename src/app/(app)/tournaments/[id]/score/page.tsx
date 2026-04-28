@@ -24,10 +24,8 @@ export default async function ScorePage({
     .single();
 
   const tournament = tournamentRaw as any;
-
   if (!tournament || tournament.status !== "in_progress") notFound();
 
-  // Get current active round
   const { data: roundsRaw } = await supabase
     .from("tournament_rounds")
     .select("*")
@@ -47,7 +45,6 @@ export default async function ScorePage({
     );
   }
 
-  // Get holes
   const courseId = currentRound.course_id ?? tournament.courses?.id;
   const { data: holesRaw } = await supabase
     .from("holes")
@@ -68,10 +65,10 @@ export default async function ScorePage({
     );
   }
 
-  // Get all registered players
+  // ← Added nickname and division to the select
   const { data: registrationsRaw } = await supabase
     .from("tournament_registrations")
-    .select("player_id, profiles(id, full_name, username)")
+    .select("player_id, profiles(id, full_name, username, nickname, division)")
     .eq("tournament_id", id);
 
   const registrations = (registrationsRaw as any[]) ?? [];
@@ -85,8 +82,13 @@ export default async function ScorePage({
     );
   }
 
-  // Get or create scorecards for all players
-  const players = [];
+  const players: {
+    id: string;
+    name: string;
+    scorecardId: string;
+    existingScores: Record<string, number>;
+    division: string;
+  }[] = [];
   for (const reg of registrations) {
     const profile = reg.profiles as any;
     if (!profile) continue;
@@ -116,9 +118,12 @@ export default async function ScorePage({
 
     players.push({
       id: reg.player_id,
-      name: profile.full_name ?? profile.username ?? "Player",
+      // Display name: nickname > full_name > username
+      name:
+        profile.nickname ?? profile.full_name ?? profile.username ?? "Player",
       scorecardId: scorecard?.id ?? "",
       existingScores,
+      division: profile.division ?? "mixed", // ← added
     });
   }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useCallback, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import {
@@ -22,7 +22,8 @@ interface Player {
   id: string;
   name: string;
   scorecardId: string;
-  existingScores: Record<string, number>; // hole_id -> throws
+  existingScores: Record<string, number>;
+  division?: string | null; // ← added
 }
 
 interface ScorecardEntryProps {
@@ -32,6 +33,11 @@ interface ScorecardEntryProps {
   roundId: string;
   roundNumber: number;
   courseName: string;
+}
+
+// Junior players get -1 from their actual throws when calculating score vs par
+function adjustedScore(throws: number, player: Player): number {
+  return player.division === "junior" ? throws - 1 : throws;
 }
 
 function scoreName(throws: number, par: number): string {
@@ -46,16 +52,6 @@ function scoreName(throws: number, par: number): string {
   return `+${diff}`;
 }
 
-function scoreColour(throws: number, par: number, dark: boolean): string {
-  const diff = throws - par;
-  if (throws === 1 || diff <= -2)
-    return dark ? "text-yellow-400" : "text-yellow-600";
-  if (diff === -1) return dark ? "text-green-400" : "text-green-600";
-  if (diff === 0) return dark ? "text-gray-300" : "text-gray-500";
-  if (diff === 1) return dark ? "text-orange-400" : "text-orange-500";
-  return dark ? "text-red-400" : "text-red-500";
-}
-
 function runningTotalColour(total: number, dark: boolean): string {
   if (total < 0) return dark ? "text-green-400" : "text-green-600";
   if (total === 0) return dark ? "text-gray-300" : "text-gray-500";
@@ -64,8 +60,23 @@ function runningTotalColour(total: number, dark: boolean): string {
 
 function formatTotal(total: number): string {
   if (total === 0) return "E";
-  if (total > 0) return `+${total}`;
-  return `${total}`;
+  return total > 0 ? `+${total}` : `${total}`;
+}
+
+function cellStyle(
+  adjustedThrows: number | undefined,
+  par: number,
+  dark: boolean,
+): string {
+  if (adjustedThrows == null) return dark ? "text-gray-600" : "text-gray-300";
+  const diff = adjustedThrows - par;
+  if (adjustedThrows === 1 || diff <= -2)
+    return dark ? "text-yellow-400 font-bold" : "text-yellow-600 font-bold";
+  if (diff === -1)
+    return dark ? "text-green-400 font-bold" : "text-green-600 font-bold";
+  if (diff === 0) return dark ? "text-gray-300" : "text-gray-500";
+  if (diff === 1) return dark ? "text-orange-400" : "text-orange-500";
+  return dark ? "text-red-400" : "text-red-500";
 }
 
 export function ScorecardEntry({
@@ -85,9 +96,7 @@ export function ScorecardEntry({
   const [scores, setScores] = useState<Record<string, Record<string, number>>>(
     () => {
       const init: Record<string, Record<string, number>> = {};
-      for (const p of players) {
-        init[p.id] = { ...p.existingScores };
-      }
+      for (const p of players) init[p.id] = { ...p.existingScores };
       return init;
     },
   );
@@ -95,22 +104,9 @@ export function ScorecardEntry({
   const [submitting, setSubmitting] = useState(false);
   const [showCancel, setShowCancel] = useState(false);
 
-  useEffect(() => {
-    for (const player of players) {
-      const hole = holes[0];
-      if (scores[player.id]?.[hole.id] == null) {
-        setScores((prev) => ({
-          ...prev,
-          [player.id]: { ...prev[player.id], [hole.id]: hole.par },
-        }));
-        saveScore(player.id, hole.id, hole.par, player.scorecardId);
-      }
-    }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
   const currentHole = holes[currentHoleIdx];
+  const d = dark;
 
-  // ── Auto-save with debounce ──
   const saveScore = useCallback(
     async (
       playerId: string,
@@ -123,9 +119,8 @@ export function ScorecardEntry({
       saveTimers.current[key] = setTimeout(async () => {
         setSaving((prev) => ({ ...prev, [key]: true }));
         const player = players.find((p) => p.id === playerId)!;
-        const existing = player.existingScores[holeId];
         const hole = holes.find((h) => h.id === holeId)!;
-
+        const existing = player.existingScores[holeId];
         if (existing != null) {
           await (supabase as any)
             .from("scores")
@@ -133,12 +128,14 @@ export function ScorecardEntry({
             .eq("scorecard_id", scorecardId)
             .eq("hole_id", holeId);
         } else {
-          await (supabase as any).from("scores").upsert({
-            scorecard_id: scorecardId,
-            hole_id: holeId,
-            hole_number: hole.hole_number,
-            throws,
-          });
+          await (supabase as any)
+            .from("scores")
+            .upsert({
+              scorecard_id: scorecardId,
+              hole_id: holeId,
+              hole_number: hole.hole_number,
+              throws,
+            });
           player.existingScores[holeId] = throws;
         }
         setSaving((prev) => ({ ...prev, [key]: false }));
@@ -148,16 +145,14 @@ export function ScorecardEntry({
   );
 
   function goToHole(idx: number) {
-    // Auto-save par for current hole if not yet scored
     const hole = holes[currentHoleIdx];
     if (scores[players[0]?.id]?.[hole.id] == null) {
       for (const player of players) {
-        const par = hole.par;
         setScores((prev) => ({
           ...prev,
-          [player.id]: { ...prev[player.id], [hole.id]: par },
+          [player.id]: { ...prev[player.id], [hole.id]: hole.par },
         }));
-        saveScore(player.id, hole.id, par, player.scorecardId);
+        saveScore(player.id, hole.id, hole.par, player.scorecardId);
       }
     }
     setCurrentHoleIdx(idx);
@@ -173,40 +168,33 @@ export function ScorecardEntry({
     saveScore(playerId, holeId, clamped, player.scorecardId);
   }
 
-  // ── Running total relative to par (holes scored so far) ──
   function getRunningTotal(playerId: string): number {
-    let total = 0;
-    for (const hole of holes) {
-      const throws = scores[playerId]?.[hole.id];
-      if (throws != null) total += throws - hole.par;
-    }
-    return total;
+    const player = players.find((p) => p.id === playerId)!;
+    return holes.reduce((total, hole) => {
+      const rawThrows = scores[playerId]?.[hole.id];
+      if (rawThrows == null) return total;
+      return total + (adjustedScore(rawThrows, player) - hole.par);
+    }, 0);
   }
+
   function getOrderedPlayers(): Player[] {
     if (currentHoleIdx === 0) return players;
     const prevHole = holes[currentHoleIdx - 1];
     return [...players].sort((a, b) => {
-      const aScore = scores[a.id]?.[prevHole.id] ?? prevHole.par;
-      const bScore = scores[b.id]?.[prevHole.id] ?? prevHole.par;
-      return aScore - bScore;
+      const aAdj = adjustedScore(
+        scores[a.id]?.[prevHole.id] ?? prevHole.par,
+        a,
+      );
+      const bAdj = adjustedScore(
+        scores[b.id]?.[prevHole.id] ?? prevHole.par,
+        b,
+      );
+      return aAdj - bAdj;
     });
-  }
-  // ── Mini scorecard cell colour ──
-  function cellStyle(throws: number | undefined, par: number): string {
-    if (throws == null) return dark ? "text-gray-600" : "text-gray-300";
-    const diff = throws - par;
-    if (throws === 1 || diff <= -2)
-      return dark ? "text-yellow-400 font-bold" : "text-yellow-600 font-bold";
-    if (diff === -1)
-      return dark ? "text-green-400 font-bold" : "text-green-600 font-bold";
-    if (diff === 0) return dark ? "text-gray-300" : "text-gray-500";
-    if (diff === 1) return dark ? "text-orange-400" : "text-orange-500";
-    return dark ? "text-red-400" : "text-red-500";
   }
 
   async function submitRound() {
     setSubmitting(true);
-    // Update total scores on all scorecards
     for (const player of players) {
       const total = holes.reduce(
         (sum, h) => sum + (scores[player.id]?.[h.id] ?? 0),
@@ -225,13 +213,11 @@ export function ScorecardEntry({
     holes.every((h) => scores[p.id]?.[h.id] != null),
   );
 
-  const d = dark;
-
   return (
     <div
       className={`min-h-screen flex flex-col ${d ? "bg-[#0d2818]" : "bg-gray-100"}`}
     >
-      {/* ── Top bar ── */}
+      {/* Top bar */}
       <div
         className={`flex items-center justify-between px-4 py-3 ${d ? "bg-[#0d2818]" : "bg-white border-b border-gray-200"}`}
       >
@@ -261,7 +247,7 @@ export function ScorecardEntry({
         </button>
       </div>
 
-      {/* ── Hole header ── */}
+      {/* Hole header */}
       <div
         className={`mx-4 mt-2 rounded-2xl p-4 ${d ? "bg-[#1a3d28]" : "bg-white border border-gray-200"}`}
       >
@@ -286,33 +272,26 @@ export function ScorecardEntry({
         </div>
       </div>
 
-      {/* ── Player score rows ── */}
+      {/* Player rows */}
       <div className="mx-4 mt-3 space-y-2 flex-1">
         {getOrderedPlayers().map((player, playerIdx) => {
-          const throws = scores[player.id]?.[currentHole.id] ?? currentHole.par;
+          const rawThrows =
+            scores[player.id]?.[currentHole.id] ?? currentHole.par;
+          const adj = adjustedScore(rawThrows, player);
           const runningTotal = getRunningTotal(player.id);
           const key = `${player.id}-${currentHole.id}`;
-          const isSaving = saving[key];
+          const isJunior = player.division === "junior";
 
           return (
             <div
               key={player.id}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl ${d ? "bg-[#1a3d28]" : "bg-white border border-gray-200"}`}
             >
-              {/* Name */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5">
                   {currentHoleIdx > 0 && (
                     <span
-                      className={`text-xs font-bold w-4 flex-shrink-0 ${
-                        playerIdx === 0
-                          ? d
-                            ? "text-yellow-400"
-                            : "text-yellow-600"
-                          : d
-                            ? "text-gray-500"
-                            : "text-gray-400"
-                      }`}
+                      className={`text-xs font-bold w-4 flex-shrink-0 ${playerIdx === 0 ? (d ? "text-yellow-400" : "text-yellow-600") : d ? "text-gray-500" : "text-gray-400"}`}
                     >
                       {playerIdx + 1}
                     </span>
@@ -322,57 +301,51 @@ export function ScorecardEntry({
                   >
                     {player.name}
                   </p>
+                  {isJunior && (
+                    <span className="text-xs bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded font-medium flex-shrink-0">
+                      JNR
+                    </span>
+                  )}
                 </div>
                 <p
                   className={`text-xs ${d ? "text-gray-400" : "text-gray-400"}`}
                 >
-                  {scoreName(throws, currentHole.par)}
+                  {scoreName(adj, currentHole.par)}
                 </p>
               </div>
-
-              {/* - button */}
               <button
                 onClick={() =>
-                  updateScore(player.id, currentHole.id, throws - 1)
+                  updateScore(player.id, currentHole.id, rawThrows - 1)
                 }
-                className={`w-9 h-9 rounded-lg font-bold text-lg flex items-center justify-center transition-all active:scale-90 ${
-                  d
-                    ? "bg-gray-700 text-white hover:bg-gray-600"
-                    : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                }`}
+                className={`w-9 h-9 rounded-lg font-bold text-lg flex items-center justify-center transition-all active:scale-90 ${d ? "bg-gray-700 text-white hover:bg-gray-600" : "bg-gray-200 text-gray-700 hover:bg-gray-300"}`}
               >
                 −
               </button>
-
-              {/* Score */}
               <div className="w-10 text-center">
                 <span
                   className={`text-3xl font-black tabular-nums ${d ? "text-white" : "text-gray-900"}`}
                 >
-                  {throws}
+                  {rawThrows}
                 </span>
+                {isJunior && (
+                  <p className="text-blue-400 text-[9px] leading-none mt-0.5">
+                    {adj} adj
+                  </p>
+                )}
               </div>
-
-              {/* + button */}
               <button
                 onClick={() =>
-                  updateScore(player.id, currentHole.id, throws + 1)
+                  updateScore(player.id, currentHole.id, rawThrows + 1)
                 }
-                className={`w-9 h-9 rounded-lg font-bold text-lg flex items-center justify-center transition-all active:scale-90 ${
-                  d
-                    ? "bg-gray-700 text-white hover:bg-gray-600"
-                    : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                }`}
+                className={`w-9 h-9 rounded-lg font-bold text-lg flex items-center justify-center transition-all active:scale-90 ${d ? "bg-gray-700 text-white hover:bg-gray-600" : "bg-gray-200 text-gray-700 hover:bg-gray-300"}`}
               >
                 +
               </button>
-
-              {/* Running total */}
               <div className="w-10 text-right">
                 <span
                   className={`text-sm font-bold tabular-nums ${runningTotalColour(runningTotal, d)}`}
                 >
-                  {isSaving ? "…" : formatTotal(runningTotal)}
+                  {saving[key] ? "…" : formatTotal(runningTotal)}
                 </span>
               </div>
             </div>
@@ -380,32 +353,22 @@ export function ScorecardEntry({
         })}
       </div>
 
-      {/* ── Navigation ── */}
+      {/* Navigation */}
       <div className="mx-4 mt-4 flex gap-3">
         <button
           onClick={() => goToHole(Math.max(0, currentHoleIdx - 1))}
           disabled={currentHoleIdx === 0}
-          className={`flex items-center gap-1 px-4 py-3 rounded-xl font-semibold text-sm transition-all disabled:opacity-30 ${
-            d
-              ? "bg-[#1a3d28] text-white hover:bg-[#254d35]"
-              : "bg-white border border-gray-200 text-gray-700 hover:bg-gray-50"
-          }`}
+          className={`flex items-center gap-1 px-4 py-3 rounded-xl font-semibold text-sm transition-all disabled:opacity-30 ${d ? "bg-[#1a3d28] text-white hover:bg-[#254d35]" : "bg-white border border-gray-200 text-gray-700"}`}
         >
           <ChevronLeft size={16} /> Prev
         </button>
-
         <div className="flex-1" />
-
         {currentHoleIdx < holes.length - 1 ? (
           <button
             onClick={() =>
               goToHole(Math.min(holes.length - 1, currentHoleIdx + 1))
             }
-            className={`flex items-center gap-1 px-4 py-3 rounded-xl font-semibold text-sm transition-all ${
-              d
-                ? "bg-green-600 hover:bg-green-500 text-white"
-                : "bg-green-600 hover:bg-green-700 text-white"
-            }`}
+            className="flex items-center gap-1 px-4 py-3 rounded-xl font-semibold text-sm bg-green-600 hover:bg-green-500 text-white transition-all"
           >
             Next <ChevronRight size={16} />
           </button>
@@ -421,7 +384,7 @@ export function ScorecardEntry({
         )}
       </div>
 
-      {/* ── Mini scorecard ── */}
+      {/* Mini scorecard */}
       <div
         className={`mx-4 mt-4 mb-6 rounded-2xl overflow-hidden ${d ? "bg-[#1a3d28]" : "bg-white border border-gray-200"}`}
       >
@@ -464,10 +427,7 @@ export function ScorecardEntry({
             </thead>
             <tbody>
               {players.map((player) => {
-                const total = holes.reduce((sum, h) => {
-                  const throws = scores[player.id]?.[h.id];
-                  return sum + (throws != null ? throws - h.par : 0);
-                }, 0);
+                const total = getRunningTotal(player.id);
                 return (
                   <tr
                     key={player.id}
@@ -478,36 +438,35 @@ export function ScorecardEntry({
                     }
                   >
                     <td
-                      className={`px-3 py-2 font-semibold whitespace-nowrap sticky left-0 truncate max-w-[80px] ${
-                        d
-                          ? "bg-[#1a3d28] text-gray-300"
-                          : "bg-white text-gray-700"
-                      }`}
+                      className={`px-3 py-2 font-semibold whitespace-nowrap sticky left-0 truncate max-w-[80px] ${d ? "bg-[#1a3d28] text-gray-300" : "bg-white text-gray-700"}`}
                     >
                       {player.name.split(" ")[0]}
+                      {player.division === "junior" && (
+                        <span className="ml-1 text-blue-400 text-[9px]">
+                          JNR
+                        </span>
+                      )}
                     </td>
                     {holes.map((h, i) => {
-                      const throws = scores[player.id]?.[h.id];
+                      const rawThrows = scores[player.id]?.[h.id];
+                      const adj =
+                        rawThrows != null
+                          ? adjustedScore(rawThrows, player)
+                          : undefined;
                       return (
                         <td
                           key={h.id}
                           onClick={() => goToHole(i)}
-                          className={`text-center px-1.5 py-2 cursor-pointer transition-colors ${
-                            i === currentHoleIdx
-                              ? d
-                                ? "bg-green-900/40"
-                                : "bg-green-50"
-                              : ""
-                          } ${cellStyle(throws, h.par)}`}
+                          className={`text-center px-1.5 py-2 cursor-pointer transition-colors ${i === currentHoleIdx ? (d ? "bg-green-900/40" : "bg-green-50") : ""} ${cellStyle(adj, h.par, dark)}`}
                         >
-                          {throws ?? "·"}
+                          {rawThrows ?? "·"}
                         </td>
                       );
                     })}
                     <td
                       className={`text-center px-2 py-2 font-bold ${runningTotalColour(total, d)}`}
                     >
-                      {total !== 0 ? formatTotal(total) : "E"}
+                      {formatTotal(total)}
                     </td>
                   </tr>
                 );
@@ -515,6 +474,8 @@ export function ScorecardEntry({
             </tbody>
           </table>
         </div>
+
+        {/* Cancel modal */}
         {showCancel && (
           <div className="fixed inset-0 z-50 flex items-center justify-center px-6">
             <div
@@ -522,29 +483,24 @@ export function ScorecardEntry({
               onClick={() => setShowCancel(false)}
             />
             <div className="relative bg-white rounded-2xl w-full max-w-sm p-6 space-y-4">
-              <h2 className="font-bold text-gray-900 text-lg">Cancel Round?</h2>
+              <h2 className="font-bold text-gray-900 text-lg">
+                Leave Scoring?
+              </h2>
               <p className="text-gray-500 text-sm">
-                Any scores entered so far have been saved. You can return to
-                this round later.
+                Your scores have been saved. You can return to this round later.
               </p>
               <div className="flex gap-3">
                 <button
                   onClick={() => setShowCancel(false)}
-                  className="flex-1 py-3 rounded-xl border border-gray-200 font-semibold text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                  className="flex-1 py-3 rounded-xl border border-gray-200 font-semibold text-sm text-gray-700 hover:bg-gray-50"
                 >
                   Keep Scoring
                 </button>
                 <button
-                  onClick={async () => {
-                    await (supabase as any)
-                      .from("casual_rounds")
-                      .update({ status: "cancelled" })
-                      .eq("id", roundId);
-                    router.push("/dashboard");
-                  }}
-                  className="flex-1 py-3 rounded-xl bg-red-500 hover:bg-red-600 font-semibold text-sm text-white transition-colors"
+                  onClick={() => router.push(`/tournaments/${tournamentId}`)}
+                  className="flex-1 py-3 rounded-xl bg-orange-500 hover:bg-orange-600 font-semibold text-sm text-white"
                 >
-                  Cancel Round
+                  Leave
                 </button>
               </div>
             </div>
