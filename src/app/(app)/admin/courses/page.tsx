@@ -4,9 +4,12 @@ import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { CourseForm } from "@/components/admin/course-form";
 import { HoleEditor } from "@/components/admin/hole-editor";
+import { LayoutEditor } from "@/components/admin/layout-editor";
+import { CourseAccordion } from "@/components/admin/course-accordion";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = { title: "Admin — Courses" };
+export const dynamic = "force-dynamic";
 
 export default async function AdminCoursesPage() {
   const supabase = await createClient();
@@ -24,7 +27,10 @@ export default async function AdminCoursesPage() {
 
   const { data: courses } = await supabase
     .from("courses")
-    .select("*, holes(id, hole_number, par, distance_m)")
+    .select(
+      "*, holes(id, hole_number, par, distance_m), course_layouts(id, name, description, hole_count, is_default)",
+    )
+    // .order("round_count", { ascending: false })
     .order("name");
 
   return (
@@ -34,46 +40,48 @@ export default async function AdminCoursesPage() {
           <ChevronLeft size={20} className="text-gray-600" />
         </Link>
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Courses</h1>
-          <p className="text-gray-500 text-sm">
+          <h1
+            className="text-2xl font-bold"
+            style={{ color: "var(--text-primary)" }}
+          >
+            Courses
+          </h1>
+          <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
             {courses?.length ?? 0} courses
           </p>
         </div>
       </div>
 
       {/* Add new course */}
-      <div className="bg-white rounded-2xl border border-gray-200 p-5">
-        <h2 className="font-semibold text-gray-900 mb-4">Add New Course</h2>
+      <div
+        className="rounded-2xl border p-5"
+        style={{
+          background: "var(--bg-card)",
+          borderColor: "var(--border-colour)",
+        }}
+      >
+        <h2
+          className="font-semibold mb-4"
+          style={{ color: "var(--text-primary)" }}
+        >
+          Add New Course
+        </h2>
         <CourseForm />
       </div>
 
-      {/* Existing courses */}
-      {(courses as any[])?.map((course: any) => (
-        <div
-          key={course.id}
-          className="bg-white rounded-2xl border border-gray-200 overflow-hidden"
-        >
-          <div className="p-4 border-b border-gray-100 flex items-center justify-between">
-            <div>
-              <h3 className="font-bold text-gray-900">{course.name}</h3>
-              <p className="text-xs text-gray-500 mt-0.5">
-                {course.city && `${course.city} · `}
-                {course.hole_count} holes
-                {!course.is_active && (
-                  <span className="text-red-500 ml-2">Inactive</span>
-                )}
-              </p>
-            </div>
-          </div>
-          <div className="p-4">
-            <HoleEditor
-              courseId={course.id}
-              holes={(course as any).holes ?? []}
-              holeCount={course.hole_count}
-            />
-          </div>
-        </div>
-      ))}
+      {/* Existing courses — collapsible */}
+      <div className="space-y-3">
+        {(courses as any[])?.map((course: any) => (
+          <CourseAccordion
+            key={course.id}
+            course={course}
+            holes={(course.holes ?? []).sort(
+              (a: any, b: any) => a.hole_number - b.hole_number,
+            )}
+            layouts={course.course_layouts ?? []}
+          />
+        ))}
+      </div>
     </div>
   );
 }

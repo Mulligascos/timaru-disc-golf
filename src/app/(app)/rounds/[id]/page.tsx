@@ -35,10 +35,7 @@ export default async function CasualRoundPage({
 
   if (!holes || holes.length === 0) {
     return (
-      <div
-        className="min-h-screen flex flex-col items-center justify-center text-center p-6"
-        style={{ background: "#000000" }}
-      >
+      <div className="min-h-screen flex flex-col items-center justify-center text-center p-6 bg-black">
         <p className="text-4xl mb-4">⚠️</p>
         <p className="font-semibold text-white">
           No holes set up for this course.
@@ -62,16 +59,13 @@ export default async function CasualRoundPage({
   const { data: scorecards } = await supabase
     .from("scorecards")
     .select(
-      "id, player_id, scores(throws, hole_id), profiles(id, full_name, username)",
+      "id, player_id, scores(throws, hole_id), profiles(id, full_name, username, nickname, division)",
     )
     .eq("casual_round_id", (round as any).id);
 
   if (!scorecards || scorecards.length === 0) {
     return (
-      <div
-        className="min-h-screen flex flex-col items-center justify-center text-center p-6"
-        style={{ background: "#000000" }}
-      >
+      <div className="min-h-screen flex flex-col items-center justify-center text-center p-6 bg-black">
         <p className="text-4xl mb-4">👥</p>
         <p className="font-semibold text-white">
           No players found for this round.
@@ -86,16 +80,23 @@ export default async function CasualRoundPage({
     for (const s of sc.scores ?? []) existingScores[s.hole_id] = s.throws;
     return {
       id: sc.player_id,
-      name: profile?.full_name ?? profile?.username ?? "Player",
+      // Display name: nickname > full_name > username
+      name:
+        profile?.nickname ??
+        profile?.full_name ??
+        profile?.username ??
+        "Player",
       scorecardId: sc.id,
       existingScores,
+      division: profile?.division ?? "mixed", // ← pass division through
     };
   });
 
   const { data: allMembers } = await supabase
     .from("profiles")
-    .select("id, full_name, username")
+    .select("id, full_name, username, nickname")
     .eq("is_active", true);
+
   const currentPlayerIds = (scorecards as any[]).map((sc: any) => sc.player_id);
 
   return (

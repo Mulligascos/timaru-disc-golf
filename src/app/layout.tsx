@@ -96,7 +96,7 @@ export default function RootLayout({
           content="black-translucent"
         />
       </head>
-      <body className={inter.className}>
+      <body className={inter.className} suppressHydrationWarning>
         <ThemeProvider>{children}</ThemeProvider>
       </body>
     </html>

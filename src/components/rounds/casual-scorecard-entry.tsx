@@ -26,6 +26,7 @@ interface Player {
   name: string;
   scorecardId: string;
   existingScores: Record<string, number>;
+  division?: string | null;
 }
 interface CasualScorecardEntryProps {
   players: Player[];
@@ -38,6 +39,12 @@ interface CasualScorecardEntryProps {
   startingHole: number;
   allMembers: any[];
   currentPlayerIds: string[];
+}
+
+// Junior players get -1 from their actual throws when calculating score vs par
+// Raw throws are saved as-is; the adjustment is display/calculation only
+function adjustedScore(throws: number, player: Player): number {
+  return player.division === "junior" ? throws - 1 : throws;
 }
 
 function scoreName(throws: number, par: number): string {
@@ -63,13 +70,13 @@ function formatTotal(total: number): string {
 }
 
 function cellStyle(
-  throws: number | undefined,
+  adjustedThrows: number | undefined,
   par: number,
   dark: boolean,
 ): string {
-  if (throws == null) return dark ? "text-gray-700" : "text-gray-300";
-  const diff = throws - par;
-  if (throws === 1 || diff <= -2)
+  if (adjustedThrows == null) return dark ? "text-gray-700" : "text-gray-300";
+  const diff = adjustedThrows - par;
+  if (adjustedThrows === 1 || diff <= -2)
     return dark ? "text-yellow-400 font-bold" : "text-yellow-600 font-bold";
   if (diff === -1)
     return dark ? "text-green-400 font-bold" : "text-green-600 font-bold";
@@ -78,7 +85,6 @@ function cellStyle(
   return dark ? "text-red-400" : "text-red-500";
 }
 
-// Dark mode colour tokens — true black theme for night use
 const dk = {
   bg: "bg-black",
   card: "bg-[#111111]",
@@ -92,7 +98,6 @@ const dk = {
   activeCell: "bg-[#1a2a1a]",
   highlightText: "text-green-400",
 };
-
 const lt = {
   bg: "bg-gray-100",
   card: "bg-white",
@@ -164,14 +169,12 @@ export function CasualScorecardEntry({
             .eq("scorecard_id", scorecardId)
             .eq("hole_id", holeId);
         } else {
-          await (supabase as any)
-            .from("scores")
-            .upsert({
-              scorecard_id: scorecardId,
-              hole_id: holeId,
-              hole_number: hole.hole_number,
-              throws,
-            });
+          await (supabase as any).from("scores").upsert({
+            scorecard_id: scorecardId,
+            hole_id: holeId,
+            hole_number: hole.hole_number,
+            throws,
+          });
           player.existingScores[holeId] = throws;
         }
         setSaving((prev) => ({ ...prev, [key]: false }));
@@ -204,10 +207,13 @@ export function CasualScorecardEntry({
     saveScore(playerId, holeId, clamped, player.scorecardId);
   }
 
+  // Running total uses adjusted score (-1 per hole for juniors)
   function getRunningTotal(playerId: string): number {
+    const player = players.find((p) => p.id === playerId)!;
     return holes.reduce((total, hole) => {
-      const throws = scores[playerId]?.[hole.id];
-      return total + (throws != null ? throws - hole.par : 0);
+      const rawThrows = scores[playerId]?.[hole.id];
+      if (rawThrows == null) return total;
+      return total + (adjustedScore(rawThrows, player) - hole.par);
     }, 0);
   }
 
@@ -215,15 +221,22 @@ export function CasualScorecardEntry({
     if (currentHoleIdx === 0) return players;
     const prevHole = holes[currentHoleIdx - 1];
     return [...players].sort((a, b) => {
-      const aScore = scores[a.id]?.[prevHole.id] ?? prevHole.par;
-      const bScore = scores[b.id]?.[prevHole.id] ?? prevHole.par;
-      return aScore - bScore;
+      const aAdj = adjustedScore(
+        scores[a.id]?.[prevHole.id] ?? prevHole.par,
+        a,
+      );
+      const bAdj = adjustedScore(
+        scores[b.id]?.[prevHole.id] ?? prevHole.par,
+        b,
+      );
+      return aAdj - bAdj;
     });
   }
 
   async function finishRound() {
     setFinishing(true);
     for (const player of players) {
+      // Save raw total to DB (unadjusted)
       const total = holes.reduce(
         (sum, h) => sum + (scores[player.id]?.[h.id] ?? 0),
         0,
@@ -248,10 +261,8 @@ export function CasualScorecardEntry({
     if (tagData && tagData.length >= 2) {
       const holders = tagData.map((tag: any) => {
         const player = players.find((p) => p.id === tag.holder_id)!;
-        const total = holes.reduce(
-          (sum, h) => sum + (scores[player.id]?.[h.id] ?? 0),
-          0,
-        );
+        // Use adjusted score for tag resolution ranking
+        const total = getRunningTotal(player.id);
         return {
           playerId: player.id,
           playerName: player.name,
@@ -318,6 +329,11 @@ export function CasualScorecardEntry({
                     </span>
                     <span className={`flex-1 font-semibold text-sm ${t.text}`}>
                       {player.name}
+                      {player.division === "junior" && (
+                        <span className="ml-1.5 text-xs bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded font-medium">
+                          JNR
+                        </span>
+                      )}
                     </span>
                     <span
                       className={`font-bold text-lg tabular-nums ${runningTotalColour(total, dark)}`}
@@ -328,7 +344,6 @@ export function CasualScorecardEntry({
                 );
               })}
           </div>
-
           {showTagResolution && tagHolders.length >= 2 && (
             <TagResolution
               roundId={roundId}
@@ -359,7 +374,7 @@ export function CasualScorecardEntry({
       >
         <button
           onClick={() => setShowCancel(true)}
-          className={`flex items-center gap-1 text-sm font-medium ${t.textMuted} hover:${t.text}`}
+          className={`flex items-center gap-1 text-sm font-medium ${t.textMuted}`}
         >
           <ChevronLeft size={16} /> Cancel
         </button>
@@ -424,9 +439,12 @@ export function CasualScorecardEntry({
       {/* Player rows */}
       <div className="mx-4 mt-3 space-y-2 flex-1">
         {getOrderedPlayers().map((player, playerIdx) => {
-          const throws = scores[player.id]?.[currentHole.id] ?? currentHole.par;
+          const rawThrows =
+            scores[player.id]?.[currentHole.id] ?? currentHole.par;
+          const adj = adjustedScore(rawThrows, player);
           const runningTotal = getRunningTotal(player.id);
           const key = `${player.id}-${currentHole.id}`;
+
           return (
             <div
               key={player.id}
@@ -444,27 +462,39 @@ export function CasualScorecardEntry({
                   <p className={`font-bold text-sm truncate ${t.text}`}>
                     {player.name}
                   </p>
+                  {player.division === "junior" && (
+                    <span className="text-xs bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded font-medium flex-shrink-0">
+                      JNR
+                    </span>
+                  )}
                 </div>
+                {/* Score name uses adjusted throws vs par */}
                 <p className={`text-xs ${t.textSub}`}>
-                  {scoreName(throws, currentHole.par)}
+                  {scoreName(adj, currentHole.par)}
                 </p>
               </div>
               <button
                 onClick={() =>
-                  updateScore(player.id, currentHole.id, throws - 1)
+                  updateScore(player.id, currentHole.id, rawThrows - 1)
                 }
                 className={`w-9 h-9 rounded-lg font-bold text-lg flex items-center justify-center active:scale-90 transition-all ${t.btnScore}`}
               >
                 −
               </button>
               <div className="w-10 text-center">
+                {/* Show raw throws on the button, adjusted in small text below */}
                 <span className={`text-3xl font-black tabular-nums ${t.text}`}>
-                  {throws}
+                  {rawThrows}
                 </span>
+                {player.division === "junior" && (
+                  <p className="text-blue-400 text-[9px] leading-none mt-0.5">
+                    {adj} adj
+                  </p>
+                )}
               </div>
               <button
                 onClick={() =>
-                  updateScore(player.id, currentHole.id, throws + 1)
+                  updateScore(player.id, currentHole.id, rawThrows + 1)
                 }
                 className={`w-9 h-9 rounded-lg font-bold text-lg flex items-center justify-center active:scale-90 transition-all ${t.btnScore}`}
               >
@@ -546,26 +576,33 @@ export function CasualScorecardEntry({
             </thead>
             <tbody>
               {players.map((player) => {
-                const total = holes.reduce((sum, h) => {
-                  const throws = scores[player.id]?.[h.id];
-                  return sum + (throws != null ? throws - h.par : 0);
-                }, 0);
+                const total = getRunningTotal(player.id);
                 return (
                   <tr key={player.id} className={`border-t ${t.divider}`}>
                     <td
                       className={`px-3 py-2 font-semibold whitespace-nowrap sticky left-0 truncate max-w-[80px] ${t.card} ${t.textSub}`}
                     >
                       {player.name.split(" ")[0]}
+                      {player.division === "junior" && (
+                        <span className="ml-1 text-blue-400 text-[9px]">
+                          JNR
+                        </span>
+                      )}
                     </td>
                     {holes.map((h, i) => {
-                      const throws = scores[player.id]?.[h.id];
+                      const rawThrows = scores[player.id]?.[h.id];
+                      const adj =
+                        rawThrows != null
+                          ? adjustedScore(rawThrows, player)
+                          : undefined;
                       return (
                         <td
                           key={h.id}
                           onClick={() => goToHole(i)}
-                          className={`text-center px-1.5 py-2 cursor-pointer transition-colors ${i === currentHoleIdx ? t.activeCell : ""} ${cellStyle(throws, h.par, dark)}`}
+                          className={`text-center px-1.5 py-2 cursor-pointer transition-colors ${i === currentHoleIdx ? t.activeCell : ""} ${cellStyle(adj, h.par, dark)}`}
                         >
-                          {throws ?? "·"}
+                          {/* Show raw throws in scorecard, colour based on adjusted */}
+                          {rawThrows ?? "·"}
                         </td>
                       );
                     })}

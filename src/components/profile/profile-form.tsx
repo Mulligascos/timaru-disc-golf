@@ -3,22 +3,55 @@
 import { useState, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
-import { Camera, Save, Tag, User, Phone, FileText, Hash } from "lucide-react";
+import {
+  Camera,
+  Save,
+  Tag,
+  User,
+  Phone,
+  FileText,
+  Hash,
+  Smile,
+  Shield,
+} from "lucide-react";
 import type { Profile } from "@/lib/types";
 
 interface ProfileFormProps {
-  profile: (Profile & { bag_tags?: { tag_number: number } | null }) | null;
+  profile:
+    | (Profile & { nickname?: string | null; division?: string | null })
+    | null;
   userId: string;
   email: string;
+  bagTagNumber?: number | null;
 }
 
-export function ProfileForm({ profile, userId, email }: ProfileFormProps) {
+const DIVISIONS = [
+  { value: "mixed", label: "Mixed", description: "Open division" },
+  { value: "female", label: "Female", description: "Female division" },
+  { value: "senior", label: "Senior", description: "Senior division" },
+  {
+    value: "junior",
+    label: "Junior",
+    description: "+1 stroke advantage per hole",
+  },
+];
+
+export function ProfileForm({
+  profile,
+  userId,
+  email,
+  bagTagNumber,
+}: ProfileFormProps) {
   const supabase = createClient();
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [fullName, setFullName] = useState(profile?.full_name ?? "");
   const [username, setUsername] = useState(profile?.username ?? "");
+  const [nickname, setNickname] = useState((profile as any)?.nickname ?? "");
+  const [division, setDivision] = useState(
+    (profile as any)?.division ?? "mixed",
+  );
   const [pdgaNumber, setPdgaNumber] = useState(profile?.pdga_number ?? "");
   const [phone, setPhone] = useState(profile?.phone ?? "");
   const [bio, setBio] = useState(profile?.bio ?? "");
@@ -55,7 +88,9 @@ export function ProfileForm({ profile, userId, email }: ProfileFormProps) {
       .from("profiles")
       .update({
         full_name: fullName,
-        username: username.toLowerCase().replace(/\s/g, ""),
+        username: username.replace(/\s/g, ""),
+        nickname: nickname || null,
+        division,
         pdga_number: pdgaNumber || null,
         phone: phone || null,
         bio: bio || null,
@@ -72,17 +107,23 @@ export function ProfileForm({ profile, userId, email }: ProfileFormProps) {
     setSaving(false);
   }
 
-  const initials = fullName
-    ? fullName
+  const displayName = nickname || fullName || username;
+  const initials = displayName
+    ? displayName
         .split(" ")
-        .map((n) => n[0])
+        .map((n: string) => n[0])
         .join("")
         .toUpperCase()
         .slice(0, 2)
-    : (username?.charAt(0)?.toUpperCase() ?? "U");
+    : "U";
 
   const inputClass =
     "w-full px-3 py-2.5 rounded-lg border text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent";
+  const inputStyle = {
+    background: "var(--bg-primary)",
+    borderColor: "var(--border-colour)",
+    color: "var(--text-primary)",
+  };
 
   return (
     <div
@@ -92,7 +133,7 @@ export function ProfileForm({ profile, userId, email }: ProfileFormProps) {
         borderColor: "var(--border-colour)",
       }}
     >
-      {/* Avatar section — always dark */}
+      {/* Avatar section */}
       <div className="bg-gradient-to-br from-gray-900 to-gray-800 px-6 py-8 flex flex-col items-center gap-4">
         <div className="relative">
           <div className="w-24 h-24 rounded-full overflow-hidden bg-green-500 flex items-center justify-center ring-4 ring-white/20">
@@ -122,13 +163,23 @@ export function ProfileForm({ profile, userId, email }: ProfileFormProps) {
           />
         </div>
         <div className="text-center">
-          <p className="text-white font-semibold">{fullName || username}</p>
-          <p className="text-gray-400 text-sm">{email}</p>
-          {profile?.bag_tags?.tag_number && (
-            <div className="mt-2 inline-flex items-center gap-1.5 bg-green-500/20 text-green-400 px-3 py-1 rounded-full text-sm font-medium">
-              <Tag size={12} /> Bag Tag #{profile.bag_tags.tag_number}
-            </div>
+          <p className="text-white font-semibold">{displayName}</p>
+          {nickname && (
+            <p className="text-gray-400 text-xs mt-0.5">@{username}</p>
           )}
+          <p className="text-gray-400 text-sm">{email}</p>
+          <div className="flex items-center justify-center gap-2 mt-2 flex-wrap">
+            {bagTagNumber && (
+              <div className="inline-flex items-center gap-1.5 bg-green-500/20 text-green-400 px-3 py-1 rounded-full text-sm font-medium">
+                <Tag size={12} /> Bag Tag #{bagTagNumber}
+              </div>
+            )}
+            {division && (
+              <div className="inline-flex items-center gap-1.5 bg-white/10 text-gray-300 px-3 py-1 rounded-full text-xs font-medium capitalize">
+                <Shield size={11} /> {division}
+              </div>
+            )}
+          </div>
         </div>
         {uploading && (
           <p className="text-green-400 text-xs">Uploading photo...</p>
@@ -151,11 +202,26 @@ export function ProfileForm({ profile, userId, email }: ProfileFormProps) {
               onChange={(e) => setFullName(e.target.value)}
               className={inputClass}
               placeholder="Your full name"
-              style={{
-                background: "var(--bg-primary)",
-                borderColor: "var(--border-colour)",
-                color: "var(--text-primary)",
-              }}
+              style={inputStyle}
+            />
+          </div>
+          <div>
+            <label
+              className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide mb-1.5"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              <Smile size={12} /> Nickname{" "}
+              <span className="text-xs normal-case font-normal opacity-60">
+                (shown everywhere)
+              </span>
+            </label>
+            <input
+              type="text"
+              value={nickname}
+              onChange={(e) => setNickname(e.target.value)}
+              className={inputClass}
+              placeholder="e.g. Birdie King"
+              style={inputStyle}
             />
           </div>
           <div>
@@ -168,14 +234,10 @@ export function ProfileForm({ profile, userId, email }: ProfileFormProps) {
             <input
               type="text"
               value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              onChange={(e) => setUsername(e.target.value.replace(/\s/g, ""))}
               className={inputClass}
               placeholder="username"
-              style={{
-                background: "var(--bg-primary)",
-                borderColor: "var(--border-colour)",
-                color: "var(--text-primary)",
-              }}
+              style={inputStyle}
             />
           </div>
           <div>
@@ -191,11 +253,7 @@ export function ProfileForm({ profile, userId, email }: ProfileFormProps) {
               onChange={(e) => setPdgaNumber(e.target.value)}
               className={inputClass}
               placeholder="e.g. 123456"
-              style={{
-                background: "var(--bg-primary)",
-                borderColor: "var(--border-colour)",
-                color: "var(--text-primary)",
-              }}
+              style={inputStyle}
             />
           </div>
           <div>
@@ -211,12 +269,54 @@ export function ProfileForm({ profile, userId, email }: ProfileFormProps) {
               onChange={(e) => setPhone(e.target.value)}
               className={inputClass}
               placeholder="e.g. 021 123 4567"
-              style={{
-                background: "var(--bg-primary)",
-                borderColor: "var(--border-colour)",
-                color: "var(--text-primary)",
-              }}
+              style={inputStyle}
             />
+          </div>
+        </div>
+
+        {/* Division selector */}
+        <div>
+          <label
+            className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide mb-2"
+            style={{ color: "var(--text-secondary)" }}
+          >
+            <Shield size={12} /> Division
+          </label>
+          <div className="grid grid-cols-2 gap-2">
+            {DIVISIONS.map((d) => (
+              <button
+                key={d.value}
+                type="button"
+                onClick={() => setDivision(d.value)}
+                className={`flex flex-col items-start px-3 py-2.5 rounded-xl border-2 text-left transition-all ${
+                  division === d.value
+                    ? "border-green-500 bg-green-500/10"
+                    : "border-[var(--border-colour)] hover:border-green-300"
+                }`}
+                style={
+                  division !== d.value
+                    ? { borderColor: "var(--border-colour)" }
+                    : undefined
+                }
+              >
+                <span
+                  className={`text-sm font-semibold ${division === d.value ? "text-green-500" : ""}`}
+                  style={
+                    division !== d.value
+                      ? { color: "var(--text-primary)" }
+                      : undefined
+                  }
+                >
+                  {d.label}
+                </span>
+                <span
+                  className="text-xs mt-0.5"
+                  style={{ color: "var(--text-secondary)" }}
+                >
+                  {d.description}
+                </span>
+              </button>
+            ))}
           </div>
         </div>
 
@@ -233,11 +333,7 @@ export function ProfileForm({ profile, userId, email }: ProfileFormProps) {
             rows={3}
             className={`${inputClass} resize-none`}
             placeholder="Tell the club a bit about yourself..."
-            style={{
-              background: "var(--bg-primary)",
-              borderColor: "var(--border-colour)",
-              color: "var(--text-primary)",
-            }}
+            style={inputStyle}
           />
         </div>
 

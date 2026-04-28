@@ -31,11 +31,7 @@ export default async function DashboardPage() {
     { data: courses },
     { data: recentRounds },
   ] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select("*, bag_tags(tag_number)")
-      .eq("id", user.id)
-      .single(),
+    supabase.from("profiles").select("*").eq("id", user.id).single(),
     supabase
       .from("announcements")
       .select("*")
@@ -58,6 +54,13 @@ export default async function DashboardPage() {
       .from("courses")
       .select("id, name, hole_count")
       .eq("is_active", true),
+    supabase
+      .from("bag_tags")
+      .select("tag_number")
+      .eq("holder_id", user.id)
+      .eq("is_active", true)
+      .eq("season", new Date().getFullYear().toString())
+      .single(),
     supabase
       .from("casual_rounds")
       .select("id, played_on, is_complete, status, courses(name)")

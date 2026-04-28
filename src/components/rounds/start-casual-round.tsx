@@ -3,12 +3,41 @@
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
-import { Play, X, Check, UserPlus, Settings } from "lucide-react";
+import {
+  Play,
+  Plus,
+  Minus,
+  X,
+  Users,
+  MapPin,
+  ChevronRight,
+  Layout,
+} from "lucide-react";
+
+interface Member {
+  id: string;
+  full_name: string | null;
+  username: string;
+  nickname?: string | null;
+}
+
+interface Course {
+  id: string;
+  name: string;
+  hole_count: number;
+}
+
+interface CourseLayout {
+  id: string;
+  name: string;
+  hole_count: number;
+  is_default: boolean;
+}
 
 interface StartCasualRoundProps {
   userId: string;
-  members: any[];
-  courses: any[];
+  members: Member[];
+  courses: Course[];
 }
 
 export function StartCasualRound({
@@ -19,343 +48,499 @@ export function StartCasualRound({
   const supabase = createClient();
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<string[]>([userId]);
-  const [courseId, setCourseId] = useState("");
-  const [playedOn, setPlayedOn] = useState(
-    new Date().toISOString().split("T")[0],
-  );
-  const [notes, setNotes] = useState("");
-  const [startingHole, setStartingHole] = useState(1);
-  const [creating, setCreating] = useState(false);
-  const [error, setError] = useState("");
+  const [step, setStep] = useState<"course" | "layout" | "players">("course");
+  const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
+  const [layouts, setLayouts] = useState<CourseLayout[]>([]);
+  const [selectedLayoutId, setSelectedLayoutId] = useState<string | null>(null);
+  const [loadingLayouts, setLoadingLayouts] = useState(false);
+  const [selectedPlayers, setSelectedPlayers] = useState<string[]>([userId]);
+  const [starting, setStarting] = useState(false);
+  const [search, setSearch] = useState("");
 
-  function toggleMember(id: string) {
-    setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+  const displayName = (m: Member) => m.nickname ?? m.full_name ?? m.username;
+
+  async function selectCourse(course: Course) {
+    setSelectedCourse(course);
+    setLoadingLayouts(true);
+
+    const { data: layoutData } = await (supabase as any)
+      .from("course_layouts")
+      .select("id, name, hole_count, is_default")
+      .eq("course_id", course.id)
+      .order("is_default", { ascending: false })
+      .order("name");
+
+    setLayouts(layoutData ?? []);
+    setLoadingLayouts(false);
+
+    if (!layoutData || layoutData.length === 0) {
+      // No layouts — skip layout step
+      setSelectedLayoutId(null);
+      setStep("players");
+    } else {
+      // Pre-select default layout
+      const def =
+        layoutData.find((l: CourseLayout) => l.is_default) ?? layoutData[0];
+      setSelectedLayoutId(def.id);
+      setStep("layout");
+    }
+  }
+
+  function togglePlayer(id: string) {
+    if (id === userId) return; // can't remove yourself
+    setSelectedPlayers((prev) =>
+      prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id],
     );
   }
 
   async function handleStart() {
-    if (!courseId) {
-      setError("Please select a course.");
-      return;
-    }
-    if (selectedIds.length < 1) {
-      setError("Select at least one player.");
-      return;
-    }
-    setCreating(true);
-    setError("");
+    if (!selectedCourse) return;
+    setStarting(true);
 
-    const { data: round, error: roundError } = await (supabase as any)
+    // Create the round
+    const { data: round, error: roundErr } = await (supabase as any)
       .from("casual_rounds")
       .insert({
-        course_id: courseId,
-        played_on: playedOn,
+        course_id: selectedCourse.id,
+        layout_id: selectedLayoutId,
         created_by: userId,
-        notes: notes || null,
-        starting_hole: startingHole,
+        played_on: new Date().toISOString().split("T")[0],
+        status: "active",
+        is_complete: false,
       })
       .select()
       .single();
 
-    if (roundError || !round) {
-      setError(roundError?.message ?? "Failed to create round");
-      setCreating(false);
+    if (roundErr || !round) {
+      setStarting(false);
       return;
     }
 
-    for (const playerId of selectedIds) {
+    // Create scorecards for each player
+    for (const playerId of selectedPlayers) {
       await (supabase as any).from("scorecards").insert({
         casual_round_id: round.id,
         player_id: playerId,
       });
     }
 
-    setCreating(false);
     setOpen(false);
     router.push(`/rounds/${round.id}`);
   }
 
-  // Get hole count for selected course to populate starting hole options
-  const selectedCourse = courses.find((c) => c.id === courseId);
+  const filteredMembers = members.filter(
+    (m) =>
+      displayName(m).toLowerCase().includes(search.toLowerCase()) ||
+      m.username.toLowerCase().includes(search.toLowerCase()),
+  );
 
-  return (
-    <>
+  if (!open) {
+    return (
       <button
         onClick={() => setOpen(true)}
-        className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors"
+        className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-full text-sm font-semibold transition-colors"
       >
-        <Play size={16} /> Start Round
+        <Play size={14} fill="white" /> Start Round
       </button>
+    );
+  }
 
-      {open && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
-          <div
-            className="absolute inset-0 bg-black/60"
-            onClick={() => setOpen(false)}
-          />
-          <div className="relative bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between rounded-t-2xl">
-              <h2 className="font-bold text-gray-900 text-lg">
-                Start Casual Round
-              </h2>
-              <button
-                onClick={() => setOpen(false)}
-                className="p-2 hover:bg-gray-100 rounded-lg"
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+      <div
+        className="absolute inset-0 bg-black/60"
+        onClick={() => {
+          setOpen(false);
+          setStep("course");
+          setSelectedCourse(null);
+        }}
+      />
+      <div
+        className="relative bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md max-h-[85vh] flex flex-col"
+        style={{ background: "var(--bg-card)" }}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 pt-5 pb-3 flex-shrink-0">
+          <div>
+            <h2
+              className="font-bold text-lg"
+              style={{ color: "var(--text-primary)" }}
+            >
+              {step === "course"
+                ? "Select Course"
+                : step === "layout"
+                  ? "Select Layout"
+                  : "Add Players"}
+            </h2>
+            {selectedCourse && (
+              <p
+                className="text-xs mt-0.5"
+                style={{ color: "var(--text-secondary)" }}
               >
-                <X size={18} />
-              </button>
+                {selectedCourse.name}
+                {selectedLayoutId && layouts.length > 0 && (
+                  <> · {layouts.find((l) => l.id === selectedLayoutId)?.name}</>
+                )}
+              </p>
+            )}
+          </div>
+          <button
+            onClick={() => {
+              setOpen(false);
+              setStep("course");
+              setSelectedCourse(null);
+            }}
+            className="p-1.5 rounded-lg"
+            style={{ color: "var(--text-secondary)" }}
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Step indicators */}
+        <div className="flex items-center gap-1 px-5 pb-3 flex-shrink-0">
+          {[
+            "course",
+            ...(layouts.length > 0 || step === "layout" ? ["layout"] : []),
+            "players",
+          ].map((s, i, arr) => (
+            <div key={s} className="flex items-center gap-1">
+              <div
+                className={`w-2 h-2 rounded-full transition-colors ${step === s ? "bg-green-500" : arr.indexOf(s) < arr.indexOf(step) ? "bg-green-300" : "bg-gray-200"}`}
+              />
+              {i < arr.length - 1 && <div className="w-4 h-px bg-gray-200" />}
             </div>
+          ))}
+        </div>
 
-            <div className="p-6 space-y-5">
-              {/* Course */}
-              <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
-                  Course *
-                </label>
-                <select
-                  value={courseId}
-                  onChange={(e) => {
-                    setCourseId(e.target.value);
-                    setStartingHole(1);
-                  }}
-                  className="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
+        <div className="flex-1 overflow-y-auto px-5 pb-5">
+          {/* Step 1: Course */}
+          {step === "course" && (
+            <div className="space-y-2">
+              {courses.length === 0 ? (
+                <p
+                  className="text-sm text-center py-8"
+                  style={{ color: "var(--text-secondary)" }}
                 >
-                  <option value="">Select course...</option>
-                  {courses.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name} ({c.hole_count} holes)
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Date + Starting hole */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
-                    Date
-                  </label>
-                  <input
-                    type="date"
-                    value={playedOn}
-                    onChange={(e) => setPlayedOn(e.target.value)}
-                    className="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
-                    Starting Hole
-                  </label>
-                  <select
-                    value={startingHole}
-                    onChange={(e) => setStartingHole(parseInt(e.target.value))}
-                    className="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
-                    disabled={!courseId}
+                  No courses set up yet.
+                </p>
+              ) : (
+                courses.map((course) => (
+                  <button
+                    key={course.id}
+                    onClick={() => selectCourse(course)}
+                    className="w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-colors hover:border-green-400"
+                    style={{
+                      borderColor: "var(--border-colour)",
+                      background: "var(--bg-primary)",
+                    }}
                   >
-                    {courseId ? (
-                      Array.from(
-                        { length: selectedCourse?.hole_count ?? 18 },
-                        (_, i) => i + 1,
-                      ).map((n) => (
-                        <option key={n} value={n}>
-                          Hole {n}
-                        </option>
-                      ))
-                    ) : (
-                      <option value={1}>Hole 1</option>
-                    )}
-                  </select>
-                  {startingHole > 1 && (
-                    <p className="text-xs text-orange-500 mt-1">
-                      Starting on hole {startingHole} — scoring will wrap around
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* Players */}
-              <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
-                  Players ({selectedIds.length} selected)
-                </label>
-                <div className="space-y-2 max-h-56 overflow-y-auto">
-                  {members.map((m) => {
-                    const isSelected = selectedIds.includes(m.id);
-                    const isMe = m.id === userId;
-                    return (
-                      <button
-                        key={m.id}
-                        onClick={() => !isMe && toggleMember(m.id)}
-                        className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all text-left ${
-                          isSelected
-                            ? "border-green-400 bg-green-50"
-                            : "border-gray-200 hover:border-gray-300"
-                        } ${isMe ? "cursor-default" : ""}`}
+                    <div className="w-9 h-9 bg-green-500/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <MapPin size={16} className="text-green-500" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p
+                        className="font-semibold text-sm"
+                        style={{ color: "var(--text-primary)" }}
                       >
-                        <div
-                          className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0 ${
-                            isSelected ? "bg-green-500" : "bg-gray-300"
-                          }`}
-                        >
-                          {(m.full_name ?? m.username)
-                            ?.charAt(0)
-                            ?.toUpperCase()}
-                        </div>
-                        <span className="flex-1 text-sm font-medium text-gray-900 truncate">
-                          {m.full_name ?? m.username}
-                          {isMe && (
-                            <span className="text-green-600 text-xs ml-1">
-                              (you)
+                        {course.name}
+                      </p>
+                      <p
+                        className="text-xs"
+                        style={{ color: "var(--text-secondary)" }}
+                      >
+                        {course.hole_count} holes
+                      </p>
+                    </div>
+                    <ChevronRight
+                      size={16}
+                      style={{ color: "var(--text-secondary)" }}
+                    />
+                  </button>
+                ))
+              )}
+            </div>
+          )}
+
+          {/* Step 2: Layout */}
+          {step === "layout" && (
+            <div className="space-y-2">
+              {loadingLayouts ? (
+                <p
+                  className="text-sm text-center py-8"
+                  style={{ color: "var(--text-secondary)" }}
+                >
+                  Loading layouts...
+                </p>
+              ) : (
+                <>
+                  {layouts.map((layout) => (
+                    <button
+                      key={layout.id}
+                      onClick={() => setSelectedLayoutId(layout.id)}
+                      className={`w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-all ${
+                        selectedLayoutId === layout.id
+                          ? "border-green-500 bg-green-500/5"
+                          : "hover:border-green-300"
+                      }`}
+                      style={
+                        selectedLayoutId !== layout.id
+                          ? {
+                              borderColor: "var(--border-colour)",
+                              background: "var(--bg-primary)",
+                            }
+                          : undefined
+                      }
+                    >
+                      <div
+                        className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${selectedLayoutId === layout.id ? "bg-green-500" : "bg-gray-100"}`}
+                      >
+                        <Layout
+                          size={16}
+                          className={
+                            selectedLayoutId === layout.id
+                              ? "text-white"
+                              : "text-gray-500"
+                          }
+                        />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p
+                            className="font-semibold text-sm"
+                            style={{ color: "var(--text-primary)" }}
+                          >
+                            {layout.name}
+                          </p>
+                          {layout.is_default && (
+                            <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">
+                              Default
                             </span>
                           )}
-                        </span>
-                        {isSelected && (
-                          <Check
-                            size={16}
-                            className="text-green-500 flex-shrink-0"
-                          />
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Notes */}
-              <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
-                  Notes (optional)
-                </label>
-                <input
-                  type="text"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="e.g. Tuesday club round"
-                  className="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                />
-              </div>
-
-              {error && <p className="text-red-600 text-sm">{error}</p>}
-
-              <button
-                onClick={handleStart}
-                disabled={creating}
-                className="w-full flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white font-semibold py-3 rounded-xl transition-colors"
-              >
-                <Play size={16} />
-                {creating ? "Creating..." : "Start Round"}
-              </button>
+                        </div>
+                        <p
+                          className="text-xs"
+                          style={{ color: "var(--text-secondary)" }}
+                        >
+                          {layout.hole_count} holes
+                        </p>
+                      </div>
+                      {selectedLayoutId === layout.id && (
+                        <div className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0">
+                          <span className="text-white text-xs">✓</span>
+                        </div>
+                      )}
+                    </button>
+                  ))}
+                  <button
+                    onClick={() => setStep("players")}
+                    className="w-full py-3 rounded-xl bg-green-600 hover:bg-green-700 text-white font-semibold text-sm mt-2 transition-colors"
+                  >
+                    Continue →
+                  </button>
+                  <button
+                    onClick={() => setStep("course")}
+                    className="w-full py-2 text-sm"
+                    style={{ color: "var(--text-secondary)" }}
+                  >
+                    ← Back
+                  </button>
+                </>
+              )}
             </div>
-          </div>
+          )}
+
+          {/* Step 3: Players */}
+          {step === "players" && (
+            <div className="space-y-3">
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search members..."
+                className="w-full px-3 py-2.5 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                style={{
+                  background: "var(--bg-primary)",
+                  borderColor: "var(--border-colour)",
+                  color: "var(--text-primary)",
+                }}
+              />
+
+              <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                {filteredMembers.map((m) => {
+                  const selected = selectedPlayers.includes(m.id);
+                  const isMe = m.id === userId;
+                  return (
+                    <button
+                      key={m.id}
+                      onClick={() => togglePlayer(m.id)}
+                      disabled={isMe}
+                      className={`w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-all ${
+                        selected
+                          ? "border-green-500 bg-green-500/5"
+                          : "hover:border-green-300"
+                      } ${isMe ? "opacity-70" : ""}`}
+                      style={
+                        !selected
+                          ? {
+                              borderColor: "var(--border-colour)",
+                              background: "var(--bg-primary)",
+                            }
+                          : undefined
+                      }
+                    >
+                      <div
+                        className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0 ${selected ? "bg-green-500" : "bg-gray-400"}`}
+                      >
+                        {displayName(m).charAt(0).toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p
+                          className="font-semibold text-sm truncate"
+                          style={{ color: "var(--text-primary)" }}
+                        >
+                          {displayName(m)}{" "}
+                          {isMe && (
+                            <span className="text-xs opacity-60">(you)</span>
+                          )}
+                        </p>
+                      </div>
+                      {selected && (
+                        <div className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0">
+                          <span className="text-white text-xs">✓</span>
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="pt-2 space-y-2">
+                <p
+                  className="text-xs text-center"
+                  style={{ color: "var(--text-secondary)" }}
+                >
+                  {selectedPlayers.length} player
+                  {selectedPlayers.length > 1 ? "s" : ""} selected
+                </p>
+                <button
+                  onClick={handleStart}
+                  disabled={starting || !selectedCourse}
+                  className="w-full flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 disabled:opacity-40 text-white font-semibold py-3 rounded-xl transition-colors"
+                >
+                  <Play size={16} fill="white" />
+                  {starting ? "Starting..." : "Start Round"}
+                </button>
+                <button
+                  onClick={() =>
+                    setStep(layouts.length > 0 ? "layout" : "course")
+                  }
+                  className="w-full py-2 text-sm"
+                  style={{ color: "var(--text-secondary)" }}
+                >
+                  ← Back
+                </button>
+              </div>
+            </div>
+          )}
         </div>
-      )}
-    </>
+      </div>
+    </div>
   );
 }
 
-// ── Separate component for managing an in-progress round ──
-interface ManageRoundProps {
-  roundId: string;
-  members: any[];
-  currentPlayerIds: string[];
-  courseName: string;
-}
-
+// ManageRound component (unchanged — kept for scorecard page)
 export function ManageRound({
   roundId,
   members,
   currentPlayerIds,
   courseName,
-}: ManageRoundProps) {
+}: {
+  roundId: string;
+  members: any[];
+  currentPlayerIds: string[];
+  courseName: string;
+}) {
   const supabase = createClient();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [adding, setAdding] = useState(false);
-  const [error, setError] = useState("");
 
-  const availableMembers = members.filter(
-    (m) => !currentPlayerIds.includes(m.id),
-  );
+  const available = members.filter((m) => !currentPlayerIds.includes(m.id));
 
-  async function addPlayer(memberId: string) {
+  async function addPlayer(playerId: string) {
     setAdding(true);
-    setError("");
-
-    const { error } = await (supabase as any).from("scorecards").insert({
-      casual_round_id: roundId,
-      player_id: memberId,
-    });
-
-    if (error) {
-      setError(error.message);
-    } else {
-      setOpen(false);
-      router.refresh();
-    }
+    await (supabase as any)
+      .from("scorecards")
+      .insert({ casual_round_id: roundId, player_id: playerId });
     setAdding(false);
+    setOpen(false);
+    router.refresh();
   }
 
-  if (availableMembers.length === 0) return null;
+  const displayName = (m: any) => m.nickname ?? m.full_name ?? m.username;
 
   return (
     <>
       <button
         onClick={() => setOpen(true)}
-        className="flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white text-sm font-semibold px-3 py-2 rounded-xl transition-colors"
+        className="p-2 rounded-lg bg-white/10 text-gray-300 hover:bg-white/20 transition-colors"
       >
-        <UserPlus size={15} /> Add Player
+        <Users size={16} />
       </button>
-
       {open && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
           <div
             className="absolute inset-0 bg-black/60"
             onClick={() => setOpen(false)}
           />
-          <div className="relative bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md max-h-[80vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between rounded-t-2xl">
-              <div>
-                <h2 className="font-bold text-gray-900">Add Player</h2>
-                <p className="text-xs text-gray-500 mt-0.5">{courseName}</p>
-              </div>
-              <button
-                onClick={() => setOpen(false)}
-                className="p-2 hover:bg-gray-100 rounded-lg"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="p-4 space-y-2">
-              <p className="text-xs text-gray-500 px-1 mb-3">
-                Select a member to add to this round. Their scorecard will start
-                from the current hole.
+          <div
+            className="relative rounded-2xl w-full max-w-sm p-5 space-y-3"
+            style={{ background: "var(--bg-card)" }}
+          >
+            <h3 className="font-bold" style={{ color: "var(--text-primary)" }}>
+              Add Player to Round
+            </h3>
+            {available.length === 0 ? (
+              <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+                All members are already in this round.
               </p>
-
-              {availableMembers.map((m) => (
-                <button
-                  key={m.id}
-                  onClick={() => addPlayer(m.id)}
-                  disabled={adding}
-                  className="w-full flex items-center gap-3 p-3 rounded-xl border border-gray-200 hover:border-green-400 hover:bg-green-50 transition-all text-left disabled:opacity-50"
-                >
-                  <div className="w-9 h-9 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 text-sm font-bold flex-shrink-0">
-                    {(m.full_name ?? m.username)?.charAt(0)?.toUpperCase()}
-                  </div>
-                  <span className="flex-1 text-sm font-medium text-gray-900">
-                    {m.full_name ?? m.username}
-                  </span>
-                  <UserPlus
-                    size={16}
-                    className="text-green-500 flex-shrink-0"
-                  />
-                </button>
-              ))}
-
-              {error && <p className="text-red-600 text-sm px-1">{error}</p>}
-            </div>
+            ) : (
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {available.map((m: any) => (
+                  <button
+                    key={m.id}
+                    onClick={() => addPlayer(m.id)}
+                    disabled={adding}
+                    className="w-full flex items-center gap-3 p-3 rounded-xl border text-left hover:border-green-400 transition-colors"
+                    style={{
+                      borderColor: "var(--border-colour)",
+                      background: "var(--bg-primary)",
+                    }}
+                  >
+                    <div className="w-8 h-8 rounded-full bg-gray-400 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                      {displayName(m).charAt(0).toUpperCase()}
+                    </div>
+                    <p
+                      className="font-semibold text-sm"
+                      style={{ color: "var(--text-primary)" }}
+                    >
+                      {displayName(m)}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            )}
+            <button
+              onClick={() => setOpen(false)}
+              className="w-full py-2.5 rounded-xl border text-sm font-semibold"
+              style={{
+                borderColor: "var(--border-colour)",
+                color: "var(--text-secondary)",
+              }}
+            >
+              Close
+            </button>
           </div>
         </div>
       )}
