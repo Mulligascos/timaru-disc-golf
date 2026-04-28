@@ -20,48 +20,87 @@ export default async function CasualRoundPage({
   const { data: round } = await supabase
     .from("casual_rounds")
     .select(
-      "id, played_on, notes, is_complete, status, course_id, starting_hole, courses(id, name, hole_count)",
+      "id, played_on, notes, is_complete, status, course_id, starting_hole, layout_id, courses(id, name, hole_count)",
     )
     .eq("id", id)
     .single();
 
   if (!round || (round as any).status === "cancelled") notFound();
 
-  const { data: holes } = await supabase
-    .from("holes")
-    .select("*")
-    .eq("course_id", (round as any).course_id)
-    .order("hole_number", { ascending: true });
+  const roundData = round as any;
 
-  if (!holes || holes.length === 0) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center text-center p-6 bg-black">
-        <p className="text-4xl mb-4">⚠️</p>
-        <p className="font-semibold text-white">
-          No holes set up for this course.
-        </p>
-        <p className="text-sm text-gray-400 mt-2">
-          Ask your admin to add holes first.
-        </p>
-      </div>
-    );
+  // ── Build hole list ──
+  // If a layout is selected, use layout_holes (which may repeat or reorder holes)
+  // Otherwise fall back to course holes ordered by hole_number
+  let scoringHoles: {
+    id: string;
+    hole_number: number;
+    par: number;
+    distance_m: number | null;
+  }[] = [];
+
+  if (roundData.layout_id) {
+    // Fetch layout holes with their source hole data
+    const { data: layoutHoles } = await supabase
+      .from("layout_holes")
+      .select(
+        "hole_number, par_override, distance_override_m, source_hole:holes!layout_holes_source_hole_id_fkey(id, hole_number, par, distance_m)",
+      )
+      .eq("layout_id", roundData.layout_id)
+      .order("hole_number", { ascending: true });
+
+    if (layoutHoles && layoutHoles.length > 0) {
+      scoringHoles = (layoutHoles as any[]).map((lh: any) => ({
+        // Use layout hole_number as the position (1, 2, 3... 18 for double round)
+        // Use a composite ID so repeated holes are treated as distinct scoring positions
+        id: `${lh.source_hole.id}_${lh.hole_number}`,
+        hole_number: lh.hole_number,
+        par: lh.par_override ?? lh.source_hole.par,
+        distance_m: lh.distance_override_m ?? lh.source_hole.distance_m,
+      }));
+    }
   }
 
-  const startingHole = (round as any).starting_hole ?? 1;
-  const startIdx = (holes as any[]).findIndex(
-    (h: any) => h.hole_number === startingHole,
-  );
-  const orderedHoles =
-    startIdx > 0
-      ? [...holes.slice(startIdx), ...holes.slice(0, startIdx)]
-      : holes;
+  // Fall back to course holes if no layout or layout has no holes
+  if (scoringHoles.length === 0) {
+    const { data: courseHoles } = await supabase
+      .from("holes")
+      .select("*")
+      .eq("course_id", roundData.course_id)
+      .order("hole_number", { ascending: true });
 
+    if (!courseHoles || courseHoles.length === 0) {
+      return (
+        <div className="min-h-screen flex flex-col items-center justify-center text-center p-6 bg-black">
+          <p className="text-4xl mb-4">⚠️</p>
+          <p className="font-semibold text-white">
+            No holes set up for this course.
+          </p>
+          <p className="text-sm text-gray-400 mt-2">
+            Ask your admin to add holes first.
+          </p>
+        </div>
+      );
+    }
+
+    // Apply starting hole offset for non-layout rounds
+    const startingHole = roundData.starting_hole ?? 1;
+    const startIdx = (courseHoles as any[]).findIndex(
+      (h: any) => h.hole_number === startingHole,
+    );
+    scoringHoles =
+      startIdx > 0
+        ? [...courseHoles.slice(startIdx), ...courseHoles.slice(0, startIdx)]
+        : (courseHoles as any[]);
+  }
+
+  // ── Build player list ──
   const { data: scorecards } = await supabase
     .from("scorecards")
     .select(
       "id, player_id, scores(throws, hole_id), profiles(id, full_name, username, nickname, division)",
     )
-    .eq("casual_round_id", (round as any).id);
+    .eq("casual_round_id", roundData.id);
 
   if (!scorecards || scorecards.length === 0) {
     return (
@@ -80,7 +119,6 @@ export default async function CasualRoundPage({
     for (const s of sc.scores ?? []) existingScores[s.hole_id] = s.throws;
     return {
       id: sc.player_id,
-      // Display name: nickname > full_name > username
       name:
         profile?.nickname ??
         profile?.full_name ??
@@ -88,7 +126,7 @@ export default async function CasualRoundPage({
         "Player",
       scorecardId: sc.id,
       existingScores,
-      division: profile?.division ?? "mixed", // ← pass division through
+      division: profile?.division ?? "mixed",
     };
   });
 
@@ -98,17 +136,29 @@ export default async function CasualRoundPage({
     .eq("is_active", true);
 
   const currentPlayerIds = (scorecards as any[]).map((sc: any) => sc.player_id);
-
+  let layoutName: string | null = null;
+  if (roundData.layout_id) {
+    const { data: layoutData } = await supabase
+      .from("course_layouts")
+      .select("name")
+      .eq("id", roundData.layout_id)
+      .single();
+    layoutName = (layoutData as any)?.name ?? null;
+  }
   return (
     <CasualScorecardEntry
       players={players}
-      holes={orderedHoles}
-      roundId={(round as any).id}
-      roundDate={(round as any).played_on}
-      courseName={(round as any).courses?.name ?? "Course"}
-      notes={(round as any).notes}
-      isComplete={(round as any).is_complete}
-      startingHole={startingHole}
+      holes={scoringHoles}
+      roundId={roundData.id}
+      roundDate={roundData.played_on}
+      courseName={
+        layoutName
+          ? `${roundData.courses?.name} · ${layoutName}`
+          : (roundData.courses?.name ?? "Course")
+      }
+      notes={roundData.notes}
+      isComplete={roundData.is_complete}
+      startingHole={roundData.starting_hole ?? 1}
       allMembers={allMembers ?? []}
       currentPlayerIds={currentPlayerIds}
     />
