@@ -36,7 +36,12 @@ export async function POST(request: Request) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
   );
 
-  const results = [];
+  const results: {
+    email: string;
+    full_name: string;
+    success: boolean;
+    error?: string;
+  }[] = [];
 
   for (const member of members) {
     const { full_name, email, username } = member;
