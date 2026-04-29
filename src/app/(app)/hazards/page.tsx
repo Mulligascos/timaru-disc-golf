@@ -37,7 +37,9 @@ export default async function HazardsPage() {
     .eq("is_active", true);
   const { data: hazards } = await supabase
     .from("hazard_reports")
-    .select("*, profiles(full_name, username), courses(name)")
+    .select(
+      "*, reporter:profiles!hazard_reports_reported_by_fkey(full_name, username, nickname), courses(name)",
+    )
     .order("created_at", { ascending: false });
 
   const open =
@@ -127,7 +129,11 @@ export default async function HazardsPage() {
 function HazardCard({ hazard: h, isAdmin }: { hazard: any; isAdmin: boolean }) {
   const sev = severityConfig[h.severity] ?? severityConfig.medium;
   const sta = statusConfig[h.status] ?? statusConfig.open;
-  const reporter = h.profiles?.full_name ?? h.profiles?.username ?? "Unknown";
+  const reporter =
+    h.reporter?.nickname ??
+    h.reporter?.full_name ??
+    h.reporter?.username ??
+    "Unknown";
   const next =
     h.status === "open"
       ? "in_review"
