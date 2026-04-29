@@ -114,7 +114,7 @@ export default async function DashboardPage() {
       {/* Hero */}
       <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl p-6 text-white relative overflow-hidden">
         <img
-          src="/images/DARKLOGO.png"
+          src="/public/images/DARKLOGO.png"
           alt=""
           className="absolute -right-6 -bottom-6 w-40 h-40 object-contain opacity-10 pointer-events-none select-none"
         />
