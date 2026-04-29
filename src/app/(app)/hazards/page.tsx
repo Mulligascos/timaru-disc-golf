@@ -2,9 +2,11 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { AlertTriangle } from "lucide-react";
 import { ReportHazardButton } from "@/components/hazards/report-hazard-button";
+import { HazardActions } from "@/components/hazards/hazard-actions";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = { title: "Hazard Reports" };
+export const dynamic = "force-dynamic";
 
 const severityConfig: Record<string, { colour: string; label: string }> = {
   low: { colour: "bg-yellow-100 text-yellow-700", label: "Low" },
@@ -31,6 +33,7 @@ export default async function HazardsPage() {
     .eq("id", user.id)
     .single();
   const isAdmin = (profile as any)?.role === "admin";
+
   const { data: courses } = await supabase
     .from("courses")
     .select("id, name")
@@ -50,6 +53,91 @@ export default async function HazardsPage() {
     (hazards as any[])?.filter((h: any) =>
       ["resolved", "closed"].includes(h.status),
     ) ?? [];
+
+  function HazardCard({ hazard: h }: { hazard: any }) {
+    const sev = severityConfig[h.severity] ?? severityConfig.medium;
+    const sta = statusConfig[h.status] ?? statusConfig.open;
+    const reporter =
+      h.reporter?.nickname ??
+      h.reporter?.full_name ??
+      h.reporter?.username ??
+      "Unknown";
+
+    return (
+      <div
+        className="rounded-2xl border overflow-hidden"
+        style={{
+          background: "var(--bg-card)",
+          borderColor: "var(--border-colour)",
+        }}
+      >
+        {h.photo_url && (
+          <img
+            src={h.photo_url}
+            alt="Hazard"
+            className="w-full h-40 object-cover"
+          />
+        )}
+        <div className="p-4 space-y-3">
+          <div className="flex items-start gap-2 flex-wrap">
+            <span
+              className={`text-xs px-2 py-1 rounded-full font-semibold ${sev.colour}`}
+            >
+              ⚠️ {sev.label} Severity
+            </span>
+            <span
+              className={`text-xs px-2 py-1 rounded-full font-semibold ${sta.colour}`}
+            >
+              {sta.label}
+            </span>
+          </div>
+
+          <p
+            className="text-sm leading-relaxed"
+            style={{ color: "var(--text-primary)" }}
+          >
+            {h.description}
+          </p>
+
+          <div
+            className="text-xs space-y-0.5"
+            style={{ color: "var(--text-secondary)" }}
+          >
+            {h.courses?.name && (
+              <p>
+                📍 {h.courses.name}
+                {h.hole_number ? ` · Hole ${h.hole_number}` : ""}
+              </p>
+            )}
+            <p>
+              Reported by {reporter} ·{" "}
+              {new Date(h.created_at).toLocaleDateString("en-NZ", {
+                day: "numeric",
+                month: "short",
+                year: "numeric",
+              })}
+            </p>
+          </div>
+
+          {h.admin_notes && (
+            <div className="bg-blue-50 rounded-xl p-3 text-xs text-blue-700">
+              <span className="font-semibold">Admin note: </span>
+              {h.admin_notes}
+            </div>
+          )}
+
+          {/* Client component handles all admin actions */}
+          {isAdmin && (
+            <HazardActions
+              hazardId={h.id}
+              currentStatus={h.status}
+              adminNotes={h.admin_notes ?? null}
+            />
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -81,11 +169,12 @@ export default async function HazardsPage() {
           </h2>
           <div className="space-y-3">
             {open.map((h: any) => (
-              <HazardCard key={h.id} hazard={h} isAdmin={isAdmin} />
+              <HazardCard key={h.id} hazard={h} />
             ))}
           </div>
         </section>
       )}
+
       {resolved.length > 0 && (
         <section>
           <h2
@@ -96,11 +185,12 @@ export default async function HazardsPage() {
           </h2>
           <div className="space-y-3">
             {resolved.map((h: any) => (
-              <HazardCard key={h.id} hazard={h} isAdmin={isAdmin} />
+              <HazardCard key={h.id} hazard={h} />
             ))}
           </div>
         </section>
       )}
+
       {(!hazards || hazards.length === 0) && (
         <div className="text-center py-16">
           <AlertTriangle
@@ -122,110 +212,6 @@ export default async function HazardsPage() {
           </p>
         </div>
       )}
-    </div>
-  );
-}
-
-function HazardCard({ hazard: h, isAdmin }: { hazard: any; isAdmin: boolean }) {
-  const sev = severityConfig[h.severity] ?? severityConfig.medium;
-  const sta = statusConfig[h.status] ?? statusConfig.open;
-  const reporter =
-    h.reporter?.nickname ??
-    h.reporter?.full_name ??
-    h.reporter?.username ??
-    "Unknown";
-  const next =
-    h.status === "open"
-      ? "in_review"
-      : h.status === "in_review"
-        ? "resolved"
-        : null;
-
-  return (
-    <div
-      className="rounded-2xl border overflow-hidden"
-      style={{
-        background: "var(--bg-card)",
-        borderColor: "var(--border-colour)",
-      }}
-    >
-      {h.photo_url && (
-        <img
-          src={h.photo_url}
-          alt="Hazard"
-          className="w-full h-40 object-cover"
-        />
-      )}
-      <div className="p-4 space-y-3">
-        <div className="flex items-start gap-2 flex-wrap">
-          <span
-            className={`text-xs px-2 py-1 rounded-full font-semibold ${sev.colour}`}
-          >
-            ⚠️ {sev.label} Severity
-          </span>
-          <span
-            className={`text-xs px-2 py-1 rounded-full font-semibold ${sta.colour}`}
-          >
-            {sta.label}
-          </span>
-        </div>
-        <p
-          className="text-sm leading-relaxed"
-          style={{ color: "var(--text-primary)" }}
-        >
-          {h.description}
-        </p>
-        <div
-          className="text-xs space-y-0.5"
-          style={{ color: "var(--text-secondary)" }}
-        >
-          {h.courses?.name && (
-            <p>
-              📍 {h.courses.name}
-              {h.hole_number ? ` · Hole ${h.hole_number}` : ""}
-            </p>
-          )}
-          <p>
-            Reported by {reporter} ·{" "}
-            {new Date(h.created_at).toLocaleDateString("en-NZ", {
-              day: "numeric",
-              month: "short",
-              year: "numeric",
-            })}
-          </p>
-        </div>
-        {h.admin_notes && (
-          <div className="bg-blue-50 rounded-xl p-3 text-xs text-blue-700">
-            <span className="font-semibold">Admin note: </span>
-            {h.admin_notes}
-          </div>
-        )}
-        {isAdmin && next && (
-          <form
-            action={async () => {
-              "use server";
-              const { createClient } = await import("@/lib/supabase/server");
-              const supabase = await createClient();
-              await (supabase as any)
-                .from("hazard_reports")
-                .update({
-                  status: next,
-                  ...(next === "resolved"
-                    ? { resolved_at: new Date().toISOString() }
-                    : {}),
-                })
-                .eq("id", h.id);
-            }}
-          >
-            <button
-              type="submit"
-              className="text-xs font-semibold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors"
-            >
-              → Mark as {next === "in_review" ? "In Review" : "Resolved"}
-            </button>
-          </form>
-        )}
-      </div>
     </div>
   );
 }
