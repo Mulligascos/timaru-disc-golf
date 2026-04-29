@@ -131,26 +131,6 @@ export default async function BagTagsPage() {
         </div>
       )}
 
-      {/* How tags work */}
-      <div
-        className="rounded-2xl p-4 text-sm space-y-1"
-        style={{
-          background: "var(--accent-50)",
-          border: "1px solid var(--accent-200)",
-          color: "var(--accent-700)",
-        }}
-      >
-        <p className="font-semibold">How Bag Tags Work</p>
-        <p>
-          Tags are played for in every round. At the end of each round, tag
-          holders are ranked by score — lowest score earns the lowest tag
-          number.
-        </p>
-        <p className="text-xs mt-1" style={{ color: "var(--accent-600)" }}>
-          Season runs October 1st → September 30th each year.
-        </p>
-      </div>
-
       {/* Leaderboard */}
       <section>
         <h2
