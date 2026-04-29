@@ -33,9 +33,11 @@ export default async function ImprovementsPage() {
     .eq("is_active", true);
   const { data: requests } = await supabase
     .from("improvement_requests")
+
     .select(
-      "*, profiles(full_name, username), courses(name), improvement_upvotes(member_id)",
+      "*, submitter:profiles!improvement_requests_submitted_by_fkey(full_name, username, nickname), courses(name), improvement_upvotes(member_id)",
     )
+
     .order("upvote_count", { ascending: false })
     .order("created_at", { ascending: false });
 
