@@ -51,9 +51,8 @@ export default async function CasualRoundPage({
 
     if (layoutHoles && layoutHoles.length > 0) {
       scoringHoles = (layoutHoles as any[]).map((lh: any) => ({
-        // Use layout hole_number as the position (1, 2, 3... 18 for double round)
-        // Use a composite ID so repeated holes are treated as distinct scoring positions
-        id: `${lh.source_hole.id}_${lh.hole_number}`,
+        id: `${lh.source_hole.id}_${lh.hole_number}`, // unique key for React/scoring state
+        source_hole_id: lh.source_hole.id, // ← add this — real UUID for DB saves
         hole_number: lh.hole_number,
         par: lh.par_override ?? lh.source_hole.par,
         distance_m: lh.distance_override_m ?? lh.source_hole.distance_m,
@@ -116,7 +115,15 @@ export default async function CasualRoundPage({
   const players = (scorecards as any[]).map((sc: any) => {
     const profile = sc.profiles as any;
     const existingScores: Record<string, number> = {};
-    for (const s of sc.scores ?? []) existingScores[s.hole_id] = s.throws;
+    for (const s of sc.scores ?? []) {
+      // Find which layout position this hole maps to
+      const layoutHole = scoringHoles.find(
+        (h: any) => (h.source_hole_id ?? h.id) === s.hole_id,
+      );
+      if (layoutHole) {
+        existingScores[layoutHole.id] = s.throws; // key by composite ID
+      }
+    }
     return {
       id: sc.player_id,
       name:
