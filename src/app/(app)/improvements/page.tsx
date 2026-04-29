@@ -69,7 +69,10 @@ export default async function ImprovementsPage() {
               (u: any) => u.member_id === user.id,
             );
             const submitter =
-              r.profiles?.full_name ?? r.profiles?.username ?? "Unknown";
+              r.submitter?.nickname ??
+              r.submitter?.full_name ??
+              r.submitter?.username ??
+              "Unknown";
             const next =
               r.status === "open"
                 ? "in_review"
