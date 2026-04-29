@@ -97,7 +97,6 @@ export function StartCasualRound({
     if (!selectedCourse) return;
     setStarting(true);
 
-    // Create the round
     const { data: round, error: roundErr } = await (supabase as any)
       .from("casual_rounds")
       .insert({
@@ -105,18 +104,18 @@ export function StartCasualRound({
         layout_id: selectedLayoutId,
         created_by: userId,
         played_on: new Date().toISOString().split("T")[0],
-        status: "active",
+        status: "in_progress", // ← fix here
         is_complete: false,
       })
       .select()
       .single();
 
     if (roundErr || !round) {
+      console.error("Failed to create round:", roundErr);
       setStarting(false);
       return;
     }
 
-    // Create scorecards for each player
     for (const playerId of selectedPlayers) {
       await (supabase as any).from("scorecards").insert({
         casual_round_id: round.id,
