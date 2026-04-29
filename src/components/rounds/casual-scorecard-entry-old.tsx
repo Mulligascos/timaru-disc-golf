@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import {
@@ -11,16 +11,13 @@ import {
   Moon,
   Calendar,
   MapPin,
-  HardDrive,
-  Wifi,
-  WifiOff,
 } from "lucide-react";
 import { ManageRound } from "@/components/rounds/start-casual-round";
 import { TagResolution } from "@/components/bag-tags/tag-resolution";
 
 interface Hole {
-  id: string;
-  source_hole_id: string;
+  id: string; // composite key for state tracking
+  source_hole_id?: string; // real UUID for DB — falls back to id if not set
   hole_number: number;
   par: number;
   distance_m: number | null;
@@ -45,40 +42,8 @@ interface CasualScorecardEntryProps {
   currentPlayerIds: string[];
 }
 
-// ── Local storage key for this round ──
-function storageKey(roundId: string) {
-  return `round_${roundId}_scores`;
-}
-
-function loadFromStorage(
-  roundId: string,
-): Record<string, Record<string, number>> | null {
-  try {
-    const raw = localStorage.getItem(storageKey(roundId));
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-}
-
-function saveToStorage(
-  roundId: string,
-  scores: Record<string, Record<string, number>>,
-) {
-  try {
-    localStorage.setItem(storageKey(roundId), JSON.stringify(scores));
-  } catch {
-    // Storage full — fail silently, scores are still in memory
-  }
-}
-
-function clearStorage(roundId: string) {
-  try {
-    localStorage.removeItem(storageKey(roundId));
-  } catch {}
-}
-
-// ── Junior scoring adjustment ──
+// Junior players get -1 from their actual throws when calculating score vs par
+// Raw throws are saved as-is; the adjustment is display/calculation only
 function adjustedScore(throws: number, player: Player): number {
   return player.division === "junior" ? throws - 1 : throws;
 }
@@ -106,13 +71,13 @@ function formatTotal(total: number): string {
 }
 
 function cellStyle(
-  adj: number | undefined,
+  adjustedThrows: number | undefined,
   par: number,
   dark: boolean,
 ): string {
-  if (adj == null) return dark ? "text-gray-700" : "text-gray-300";
-  const diff = adj - par;
-  if (adj === 1 || diff <= -2)
+  if (adjustedThrows == null) return dark ? "text-gray-700" : "text-gray-300";
+  const diff = adjustedThrows - par;
+  if (adjustedThrows === 1 || diff <= -2)
     return dark ? "text-yellow-400 font-bold" : "text-yellow-600 font-bold";
   if (diff === -1)
     return dark ? "text-green-400 font-bold" : "text-green-600 font-bold";
@@ -162,82 +127,89 @@ export function CasualScorecardEntry({
 }: CasualScorecardEntryProps) {
   const supabase = createClient();
   const router = useRouter();
+  const saveTimers = useRef<Record<string, NodeJS.Timeout>>({});
 
   const [dark, setDark] = useState(true);
   const [currentHoleIdx, setCurrentHoleIdx] = useState(0);
   const [isComplete, setIsComplete] = useState(initialComplete);
   const [players] = useState(initialPlayers);
   const [showCancel, setShowCancel] = useState(false);
-  const [finishing, setFinishing] = useState(false);
-  const [finishError, setFinishError] = useState("");
-  const [showTagResolution, setShowTagResolution] = useState(false);
-  const [tagHolders, setTagHolders] = useState<any[]>([]);
-  const [synced, setSynced] = useState(false); // true after successful DB sync
-
-  // ── Initialise scores: merge DB scores with localStorage ──
   const [scores, setScores] = useState<Record<string, Record<string, number>>>(
     () => {
-      // Start with DB scores
       const init: Record<string, Record<string, number>> = {};
       for (const p of initialPlayers) init[p.id] = { ...p.existingScores };
-
-      // Merge localStorage on top (localStorage wins — more recent)
-      const stored = loadFromStorage(roundId);
-      if (stored) {
-        for (const playerId of Object.keys(stored)) {
-          if (!init[playerId]) init[playerId] = {};
-          Object.assign(init[playerId], stored[playerId]);
-        }
-      }
       return init;
     },
   );
+  const [saving, setSaving] = useState<Record<string, boolean>>({});
+  const [finishing, setFinishing] = useState(false);
+  const [showTagResolution, setShowTagResolution] = useState(false);
+  const [tagHolders, setTagHolders] = useState<any[]>([]);
 
   const currentHole = holes[currentHoleIdx];
   const t = dark ? dk : lt;
 
-  // ── Every score change saves to localStorage immediately ──
-  function updateScore(playerId: string, holeId: string, val: number) {
-    const clamped = Math.max(1, val);
-    setScores((prev) => {
-      const next = {
-        ...prev,
-        [playerId]: { ...prev[playerId], [holeId]: clamped },
-      };
-      // Instant localStorage write — no network
-      saveToStorage(roundId, next);
-      return next;
-    });
-  }
+  const saveScore = useCallback(
+    async (
+      playerId: string,
+      holeId: string,
+      throws: number,
+      scorecardId: string,
+    ) => {
+      const key = `${playerId}-${holeId}`;
+      if (saveTimers.current[key]) clearTimeout(saveTimers.current[key]);
+      saveTimers.current[key] = setTimeout(async () => {
+        setSaving((prev) => ({ ...prev, [key]: true }));
+        const player = players.find((p) => p.id === playerId)!;
+        const hole = holes.find((h) => h.id === holeId)!;
+        const existing = player.existingScores[holeId];
+        const dbHoleId = hole.source_hole_id ?? hole.id; // ← use real UUID
+        if (existing != null) {
+          await (supabase as any)
+            .from("scores")
+            .update({ throws })
+            .eq("scorecard_id", scorecardId)
+            .eq("hole_id", holeId);
+        } else {
+          await (supabase as any).from("scores").upsert({
+            scorecard_id: scorecardId,
+            hole_id: dbHoleId, // ← was: hole.id
+            hole_number: hole.hole_number,
+            throws,
+          });
+          player.existingScores[holeId] = throws;
+        }
+        setSaving((prev) => ({ ...prev, [key]: false }));
+      }, 600);
+    },
+    [players, holes, supabase],
+  );
 
   function goToHole(idx: number) {
-    // Auto-fill par for unscored holes on navigation
     const hole = holes[currentHoleIdx];
-    let needsSave = false;
-    const updates: Record<string, Record<string, number>> = {};
-
-    for (const player of players) {
-      if (scores[player.id]?.[hole.id] == null) {
-        if (!updates[player.id]) updates[player.id] = {};
-        updates[player.id][hole.id] = hole.par;
-        needsSave = true;
+    if (scores[players[0]?.id]?.[hole.id] == null) {
+      for (const player of players) {
+        setScores((prev) => ({
+          ...prev,
+          [player.id]: { ...prev[player.id], [hole.id]: hole.par },
+        }));
+        saveScore(player.id, hole.id, hole.par, player.scorecardId);
       }
     }
-
-    if (needsSave) {
-      setScores((prev) => {
-        const next = { ...prev };
-        for (const [pid, holeScores] of Object.entries(updates)) {
-          next[pid] = { ...next[pid], ...holeScores };
-        }
-        saveToStorage(roundId, next);
-        return next;
-      });
-    }
-
     setCurrentHoleIdx(idx);
   }
 
+  function updateScore(playerId: string, holeId: string, val: number) {
+    const clamped = Math.max(1, val);
+    setScores((prev) => ({
+      ...prev,
+      [playerId]: { ...prev[playerId], [holeId]: clamped },
+    }));
+    const player = players.find((p) => p.id === playerId)!;
+    saveScore(playerId, holeId, clamped, player.scorecardId);
+  }
+
+  // Running total uses adjusted score (-1 per hole for juniors)
   function getRunningTotal(playerId: string): number {
     const player = players.find((p) => p.id === playerId)!;
     return holes.reduce((total, hole) => {
@@ -263,99 +235,56 @@ export function CasualScorecardEntry({
     });
   }
 
-  // ── Finish round: single bulk DB write ──
   async function finishRound() {
     setFinishing(true);
-    setFinishError("");
-
-    try {
-      // Build all score rows for bulk upsert
-      const scoreRows: any[] = [];
-      for (const player of players) {
-        for (const hole of holes) {
-          const throws = scores[player.id]?.[hole.id];
-          if (throws != null) {
-            scoreRows.push({
-              scorecard_id: player.scorecardId,
-              hole_id: hole.source_hole_id, // real UUID for DB
-              hole_number: hole.hole_number,
-              throws,
-            });
-          }
-        }
-      }
-
-      // Single bulk upsert for all scores
-      if (scoreRows.length > 0) {
-        const { error: scoresError } = await (supabase as any)
-          .from("scores")
-          .upsert(scoreRows, { onConflict: "scorecard_id,hole_id" });
-
-        if (scoresError) throw new Error(scoresError.message);
-      }
-
-      // Update scorecard totals
-      for (const player of players) {
-        const rawTotal = holes.reduce(
-          (sum, h) => sum + (scores[player.id]?.[h.id] ?? 0),
-          0,
-        );
-        await (supabase as any)
-          .from("scorecards")
-          .update({ total_score: rawTotal })
-          .eq("id", player.scorecardId);
-      }
-
-      // Mark round complete
-      const { error: roundError } = await (supabase as any)
-        .from("casual_rounds")
-        .update({ is_complete: true, status: "completed" })
-        .eq("id", roundId);
-
-      if (roundError) throw new Error(roundError.message);
-
-      setSynced(true);
-
-      // Check for bag tag resolution
-      const playerIds = players.map((p) => p.id);
-      const { data: tagData } = await (supabase as any)
-        .from("bag_tags")
-        .select("id, tag_number, holder_id")
-        .in("holder_id", playerIds)
-        .eq("is_active", true);
-
-      if (tagData && tagData.length >= 2) {
-        const holders = tagData.map((tag: any) => {
-          const player = players.find((p) => p.id === tag.holder_id)!;
-          const total = getRunningTotal(player.id);
-          return {
-            playerId: player.id,
-            playerName: player.name,
-            tagId: tag.id,
-            tagNumber: tag.tag_number,
-            score: total,
-            playoffScore: null,
-          };
-        });
-        setTagHolders(holders);
-        setShowTagResolution(true);
-      } else {
-        // Clear localStorage only after successful sync
-        clearStorage(roundId);
-        setIsComplete(true);
-      }
-    } catch (err: any) {
-      setFinishError(err.message ?? "Failed to save scores. Please try again.");
-      setFinishing(false);
+    for (const player of players) {
+      // Save raw total to DB (unadjusted)
+      const total = holes.reduce(
+        (sum, h) => sum + (scores[player.id]?.[h.id] ?? 0),
+        0,
+      );
+      await (supabase as any)
+        .from("scorecards")
+        .update({ total_score: total })
+        .eq("id", player.scorecardId);
     }
+    await (supabase as any)
+      .from("casual_rounds")
+      .update({ is_complete: true, status: "completed" })
+      .eq("id", roundId);
+
+    const playerIds = players.map((p) => p.id);
+    const { data: tagData } = await (supabase as any)
+      .from("bag_tags")
+      .select("id, tag_number, holder_id")
+      .in("holder_id", playerIds)
+      .eq("is_active", true);
+
+    if (tagData && tagData.length >= 2) {
+      const holders = tagData.map((tag: any) => {
+        const player = players.find((p) => p.id === tag.holder_id)!;
+        // Use adjusted score for tag resolution ranking
+        const total = getRunningTotal(player.id);
+        return {
+          playerId: player.id,
+          playerName: player.name,
+          tagId: tag.id,
+          tagNumber: tag.tag_number,
+          score: total,
+          playoffScore: null,
+        };
+      });
+      setTagHolders(holders);
+      setShowTagResolution(true);
+    } else {
+      setIsComplete(true);
+    }
+    setFinishing(false);
   }
 
   const allScored = players.every((p) =>
     holes.every((h) => scores[p.id]?.[h.id] != null),
   );
-  const scoredCount = holes.filter((h) =>
-    players.every((p) => scores[p.id]?.[h.id] != null),
-  ).length;
 
   // ── Completed summary ──
   if (isComplete) {
@@ -423,7 +352,6 @@ export function CasualScorecardEntry({
               roundType="casual"
               tagHolders={tagHolders}
               onDismiss={() => {
-                clearStorage(roundId);
                 setShowTagResolution(false);
                 setIsComplete(true);
               }}
@@ -474,15 +402,6 @@ export function CasualScorecardEntry({
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {/* Local save indicator */}
-          <div
-            className={`flex items-center gap-1 text-xs px-2 py-1 rounded-full ${dark ? "bg-white/10" : "bg-gray-100"}`}
-          >
-            <HardDrive size={10} className="text-green-400" />
-            <span className="text-green-400 font-medium">
-              {scoredCount}/{holes.length}
-            </span>
-          </div>
           <ManageRound
             roundId={roundId}
             members={allMembers}
@@ -526,7 +445,7 @@ export function CasualScorecardEntry({
             scores[player.id]?.[currentHole.id] ?? currentHole.par;
           const adj = adjustedScore(rawThrows, player);
           const runningTotal = getRunningTotal(player.id);
-          const isJunior = player.division === "junior";
+          const key = `${player.id}-${currentHole.id}`;
 
           return (
             <div
@@ -545,12 +464,13 @@ export function CasualScorecardEntry({
                   <p className={`font-bold text-sm truncate ${t.text}`}>
                     {player.name}
                   </p>
-                  {isJunior && (
+                  {player.division === "junior" && (
                     <span className="text-xs bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded font-medium flex-shrink-0">
                       JNR
                     </span>
                   )}
                 </div>
+                {/* Score name uses adjusted throws vs par */}
                 <p className={`text-xs ${t.textSub}`}>
                   {scoreName(adj, currentHole.par)}
                 </p>
@@ -564,10 +484,11 @@ export function CasualScorecardEntry({
                 −
               </button>
               <div className="w-10 text-center">
+                {/* Show raw throws on the button, adjusted in small text below */}
                 <span className={`text-3xl font-black tabular-nums ${t.text}`}>
                   {rawThrows}
                 </span>
-                {isJunior && (
+                {player.division === "junior" && (
                   <p className="text-blue-400 text-[9px] leading-none mt-0.5">
                     {adj} adj
                   </p>
@@ -585,7 +506,7 @@ export function CasualScorecardEntry({
                 <span
                   className={`text-sm font-bold tabular-nums ${runningTotalColour(runningTotal, dark)}`}
                 >
-                  {formatTotal(runningTotal)}
+                  {saving[key] ? "…" : formatTotal(runningTotal)}
                 </span>
               </div>
             </div>
@@ -613,21 +534,14 @@ export function CasualScorecardEntry({
             Next <ChevronRight size={16} />
           </button>
         ) : (
-          <div className="flex flex-col items-end gap-1">
-            {finishError && (
-              <p className="text-xs text-red-400 text-right max-w-[200px]">
-                {finishError}
-              </p>
-            )}
-            <button
-              onClick={finishRound}
-              disabled={!allScored || finishing}
-              className="flex items-center gap-2 px-4 py-3 rounded-xl font-semibold text-sm bg-green-600 hover:bg-green-500 text-white disabled:opacity-40 transition-all"
-            >
-              <CheckCircle size={16} />
-              {finishing ? "Saving..." : "Finish Round"}
-            </button>
-          </div>
+          <button
+            onClick={finishRound}
+            disabled={!allScored || finishing}
+            className="flex items-center gap-2 px-4 py-3 rounded-xl font-semibold text-sm bg-green-600 hover:bg-green-500 text-white disabled:opacity-40 transition-all"
+          >
+            <CheckCircle size={16} />
+            {finishing ? "Saving..." : "Finish Round"}
+          </button>
         )}
       </div>
 
@@ -689,6 +603,7 @@ export function CasualScorecardEntry({
                           onClick={() => goToHole(i)}
                           className={`text-center px-1.5 py-2 cursor-pointer transition-colors ${i === currentHoleIdx ? t.activeCell : ""} ${cellStyle(adj, h.par, dark)}`}
                         >
+                          {/* Show raw throws in scorecard, colour based on adjusted */}
                           {rawThrows ?? "·"}
                         </td>
                       );
@@ -718,8 +633,8 @@ export function CasualScorecardEntry({
           >
             <h2 className={`font-bold text-lg ${t.text}`}>Cancel Round?</h2>
             <p className={`text-sm ${t.textMuted}`}>
-              Your scores are saved on this device. You can return to this round
-              later from the dashboard.
+              Any scores entered so far have been saved. You can return to this
+              round later from the dashboard.
             </p>
             <div className="flex gap-3">
               <button
@@ -729,10 +644,16 @@ export function CasualScorecardEntry({
                 Keep Scoring
               </button>
               <button
-                onClick={() => router.push("/dashboard")}
-                className="flex-1 py-3 rounded-xl bg-orange-500 hover:bg-orange-600 font-semibold text-sm text-white transition-colors"
+                onClick={async () => {
+                  await (supabase as any)
+                    .from("casual_rounds")
+                    .update({ status: "cancelled" })
+                    .eq("id", roundId);
+                  router.push("/dashboard");
+                }}
+                className="flex-1 py-3 rounded-xl bg-red-500 hover:bg-red-600 font-semibold text-sm text-white transition-colors"
               >
-                Save & Exit
+                Cancel Round
               </button>
             </div>
           </div>
