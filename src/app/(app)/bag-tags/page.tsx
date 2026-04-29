@@ -14,32 +14,39 @@ export default async function BagTagsPage() {
   if (!user) redirect("/login");
 
   const currentSeason = new Date().getFullYear().toString();
-  const [{ data: profile }, { data: tags }, { data: history }] =
-    await Promise.all([
-      supabase
-        .from("profiles")
-        .select("*, bag_tags(id, tag_number, season)")
-        .eq("id", user.id)
-        .single(),
-      supabase
-        .from("bag_tags")
-        .select(
-          "*, holder:profiles!bag_tags_holder_id_fkey(id, username, full_name, avatar_url)",
-        )
-        .eq("is_active", true)
-        .eq("season", currentSeason)
-        .order("tag_number", { ascending: true }),
-      supabase
-        .from("tag_history")
-        .select(
-          "*, bag_tags(tag_number), from_profile:profiles!tag_history_from_holder_id_fkey(username, full_name), to_profile:profiles!tag_history_to_holder_id_fkey(username, full_name)",
-        )
-        .order("transferred_at", { ascending: false })
-        .limit(10),
-    ]);
+  const [
+    { data: profile },
+    // { data: myTag },
+    { data: tags },
+    { data: history },
+  ] = await Promise.all([
+    supabase.from("profiles").select("*").eq("id", user.id).single(),
+    supabase
+      .from("bag_tags")
+      .select("id, tag_number, season")
+      .eq("holder_id", user.id)
+      .eq("is_active", true)
+      .eq("season", currentSeason)
+      .maybeSingle(),
+    supabase
+      .from("bag_tags")
+      .select(
+        "*, holder:profiles!bag_tags_holder_id_fkey(id, username, full_name, nickname, avatar_url)",
+      )
+      .eq("is_active", true)
+      .eq("season", currentSeason)
+      .order("tag_number", { ascending: true }),
+    supabase
+      .from("tag_history")
+      .select(
+        "*, bag_tags(tag_number), from_profile:profiles!tag_history_from_holder_id_fkey(username, full_name, nickname), to_profile:profiles!tag_history_to_holder_id_fkey(username, full_name, nickname)",
+      )
+      .order("transferred_at", { ascending: false })
+      .limit(10),
+  ]);
 
   const myTag = (profile as any)?.bag_tags;
-  const allTags = (tags as any[]) ?? [];
+  const allTags = (tags as any) ?? [];
   const claimed = allTags.filter((t) => t.holder_id);
   const unclaimed = allTags.filter((t) => !t.holder_id);
 
@@ -177,7 +184,10 @@ export default async function BagTagsPage() {
               {claimed.map((tag: any, i: number) => {
                 const isMe = tag.holder_id === user.id;
                 const name =
-                  tag.holder?.full_name ?? tag.holder?.username ?? "Unknown";
+                  tag.holder?.nickname ??
+                  tag.holder?.full_name ??
+                  tag.holder?.username ??
+                  "Unknown";
                 const initials = name.charAt(0).toUpperCase();
                 return (
                   <div
