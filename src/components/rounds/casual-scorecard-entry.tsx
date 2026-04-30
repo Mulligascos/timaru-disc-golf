@@ -170,16 +170,29 @@ export function CasualScorecardEntry({
   // ── Initialise scores: merge DB scores with any localStorage scores ──
   const [scores, setScores] = useState<Record<string, Record<string, number>>>(
     () => {
-      const dbScores: Record<string, Record<string, number>> = {};
-      for (const p of initialPlayers) dbScores[p.id] = { ...p.existingScores };
-
-      // Merge with localStorage (localStorage wins for any conflicts — it's more recent)
-      const stored = loadFromStorage(roundId);
-      const merged = { ...dbScores };
-      for (const playerId of Object.keys(stored)) {
-        merged[playerId] = { ...dbScores[playerId], ...stored[playerId] };
+      const init: Record<string, Record<string, number>> = {};
+      for (const p of initialPlayers) {
+        init[p.id] = {};
+        // Pre-fill all holes with par as default
+        for (const h of holes) {
+          init[p.id][h.id] = h.par;
+        }
+        // Override with existing DB scores
+        Object.assign(init[p.id], p.existingScores);
       }
-      return merged;
+
+      // Merge localStorage on top
+      const stored = loadFromStorage(roundId);
+      if (stored) {
+        for (const playerId of Object.keys(stored)) {
+          if (!init[playerId]) init[playerId] = {};
+          Object.assign(init[playerId], stored[playerId]);
+        }
+      }
+
+      // Save pre-filled state to localStorage immediately
+      saveToStorage(roundId, init);
+      return init;
     },
   );
 
@@ -273,6 +286,17 @@ export function CasualScorecardEntry({
           return;
         }
       }
+      // After building scoreRows, deduplicate by scorecard_id + hole_id
+      const deduped = new Map<string, any>();
+      for (const row of scoreRows) {
+        const key = `${row.scorecard_id}_${row.hole_id}`;
+        deduped.set(key, row); // last one wins
+      }
+      const dedupedRows = Array.from(deduped.values());
+
+      const { error: scoresError } = await (supabase as any)
+        .from("scores")
+        .upsert(dedupedRows, { onConflict: "scorecard_id,hole_id" });
 
       // 2. Update scorecard totals
       for (const player of players) {
