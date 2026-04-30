@@ -37,6 +37,7 @@ export default async function CasualRoundPage({
     hole_number: number;
     par: number;
     distance_m: number | null;
+    source_hole_id: string;
   }[] = [];
 
   if (roundData.layout_id) {

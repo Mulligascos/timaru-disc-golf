@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import {
@@ -11,7 +11,6 @@ import {
   Moon,
   Calendar,
   MapPin,
-  HardDrive,
   Wifi,
   WifiOff,
 } from "lucide-react";
@@ -45,44 +44,10 @@ interface CasualScorecardEntryProps {
   currentPlayerIds: string[];
 }
 
-// ── Local storage key for this round ──
-function storageKey(roundId: string) {
-  return `round_${roundId}_scores`;
-}
-
-function loadFromStorage(
-  roundId: string,
-): Record<string, Record<string, number>> | null {
-  try {
-    const raw = localStorage.getItem(storageKey(roundId));
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-}
-
-function saveToStorage(
-  roundId: string,
-  scores: Record<string, Record<string, number>>,
-) {
-  try {
-    localStorage.setItem(storageKey(roundId), JSON.stringify(scores));
-  } catch {
-    // Storage full — fail silently, scores are still in memory
-  }
-}
-
-function clearStorage(roundId: string) {
-  try {
-    localStorage.removeItem(storageKey(roundId));
-  } catch {}
-}
-
-// ── Junior scoring adjustment ──
+// ── Scoring helpers ──
 function adjustedScore(throws: number, player: Player): number {
   return player.division === "junior" ? throws - 1 : throws;
 }
-
 function scoreName(throws: number, par: number): string {
   const diff = throws - par;
   if (throws === 1) return "ACE";
@@ -93,18 +58,15 @@ function scoreName(throws: number, par: number): string {
   if (diff === 2) return "Double";
   return `+${diff}`;
 }
-
 function runningTotalColour(total: number, dark: boolean): string {
   if (total < 0) return dark ? "text-green-400" : "text-green-600";
   if (total === 0) return dark ? "text-gray-400" : "text-gray-500";
   return dark ? "text-red-400" : "text-red-500";
 }
-
 function formatTotal(total: number): string {
   if (total === 0) return "E";
   return total > 0 ? `+${total}` : `${total}`;
 }
-
 function cellStyle(
   adj: number | undefined,
   par: number,
@@ -121,6 +83,7 @@ function cellStyle(
   return dark ? "text-red-400" : "text-red-500";
 }
 
+// ── Theme tokens ──
 const dk = {
   bg: "bg-black",
   card: "bg-[#111111]",
@@ -148,6 +111,37 @@ const lt = {
   highlightText: "text-green-600",
 };
 
+// ── localStorage helpers ──
+const storageKey = (roundId: string) => `round_scores_${roundId}`;
+
+function loadFromStorage(
+  roundId: string,
+): Record<string, Record<string, number>> {
+  try {
+    const raw = localStorage.getItem(storageKey(roundId));
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveToStorage(
+  roundId: string,
+  scores: Record<string, Record<string, number>>,
+) {
+  try {
+    localStorage.setItem(storageKey(roundId), JSON.stringify(scores));
+  } catch {
+    // localStorage full or unavailable — continue silently
+  }
+}
+
+function clearStorage(roundId: string) {
+  try {
+    localStorage.removeItem(storageKey(roundId));
+  } catch {}
+}
+
 export function CasualScorecardEntry({
   players: initialPlayers,
   holes,
@@ -172,31 +166,27 @@ export function CasualScorecardEntry({
   const [finishError, setFinishError] = useState("");
   const [showTagResolution, setShowTagResolution] = useState(false);
   const [tagHolders, setTagHolders] = useState<any[]>([]);
-  const [synced, setSynced] = useState(false); // true after successful DB sync
 
-  // ── Initialise scores: merge DB scores with localStorage ──
+  // ── Initialise scores: merge DB scores with any localStorage scores ──
   const [scores, setScores] = useState<Record<string, Record<string, number>>>(
     () => {
-      // Start with DB scores
-      const init: Record<string, Record<string, number>> = {};
-      for (const p of initialPlayers) init[p.id] = { ...p.existingScores };
+      const dbScores: Record<string, Record<string, number>> = {};
+      for (const p of initialPlayers) dbScores[p.id] = { ...p.existingScores };
 
-      // Merge localStorage on top (localStorage wins — more recent)
+      // Merge with localStorage (localStorage wins for any conflicts — it's more recent)
       const stored = loadFromStorage(roundId);
-      if (stored) {
-        for (const playerId of Object.keys(stored)) {
-          if (!init[playerId]) init[playerId] = {};
-          Object.assign(init[playerId], stored[playerId]);
-        }
+      const merged = { ...dbScores };
+      for (const playerId of Object.keys(stored)) {
+        merged[playerId] = { ...dbScores[playerId], ...stored[playerId] };
       }
-      return init;
+      return merged;
     },
   );
 
   const currentHole = holes[currentHoleIdx];
   const t = dark ? dk : lt;
 
-  // ── Every score change saves to localStorage immediately ──
+  // ── Score update — localStorage only, no network ──
   function updateScore(playerId: string, holeId: string, val: number) {
     const clamped = Math.max(1, val);
     setScores((prev) => {
@@ -204,38 +194,9 @@ export function CasualScorecardEntry({
         ...prev,
         [playerId]: { ...prev[playerId], [holeId]: clamped },
       };
-      // Instant localStorage write — no network
-      saveToStorage(roundId, next);
+      saveToStorage(roundId, next); // instant localStorage save
       return next;
     });
-  }
-
-  function goToHole(idx: number) {
-    // Auto-fill par for unscored holes on navigation
-    const hole = holes[currentHoleIdx];
-    let needsSave = false;
-    const updates: Record<string, Record<string, number>> = {};
-
-    for (const player of players) {
-      if (scores[player.id]?.[hole.id] == null) {
-        if (!updates[player.id]) updates[player.id] = {};
-        updates[player.id][hole.id] = hole.par;
-        needsSave = true;
-      }
-    }
-
-    if (needsSave) {
-      setScores((prev) => {
-        const next = { ...prev };
-        for (const [pid, holeScores] of Object.entries(updates)) {
-          next[pid] = { ...next[pid], ...holeScores };
-        }
-        saveToStorage(roundId, next);
-        return next;
-      });
-    }
-
-    setCurrentHoleIdx(idx);
   }
 
   function getRunningTotal(playerId: string): number {
@@ -263,13 +224,29 @@ export function CasualScorecardEntry({
     });
   }
 
-  // ── Finish round: single bulk DB write ──
+  function goToHole(idx: number) {
+    // Auto-fill par for unscored holes when navigating past them
+    const hole = holes[currentHoleIdx];
+    if (scores[players[0]?.id]?.[hole.id] == null) {
+      setScores((prev) => {
+        const next = { ...prev };
+        for (const player of players) {
+          next[player.id] = { ...next[player.id], [hole.id]: hole.par };
+        }
+        saveToStorage(roundId, next);
+        return next;
+      });
+    }
+    setCurrentHoleIdx(idx);
+  }
+
+  // ── Finish round — single bulk save ──
   async function finishRound() {
     setFinishing(true);
     setFinishError("");
 
     try {
-      // Build all score rows for bulk upsert
+      // 1. Bulk upsert all scores in one call
       const scoreRows: any[] = [];
       for (const player of players) {
         for (const hole of holes) {
@@ -285,16 +262,19 @@ export function CasualScorecardEntry({
         }
       }
 
-      // Single bulk upsert for all scores
       if (scoreRows.length > 0) {
         const { error: scoresError } = await (supabase as any)
           .from("scores")
           .upsert(scoreRows, { onConflict: "scorecard_id,hole_id" });
 
-        if (scoresError) throw new Error(scoresError.message);
+        if (scoresError) {
+          setFinishError("Failed to save scores. Please try again.");
+          setFinishing(false);
+          return;
+        }
       }
 
-      // Update scorecard totals
+      // 2. Update scorecard totals
       for (const player of players) {
         const rawTotal = holes.reduce(
           (sum, h) => sum + (scores[player.id]?.[h.id] ?? 0),
@@ -306,17 +286,16 @@ export function CasualScorecardEntry({
           .eq("id", player.scorecardId);
       }
 
-      // Mark round complete
-      const { error: roundError } = await (supabase as any)
+      // 3. Mark round complete
+      await (supabase as any)
         .from("casual_rounds")
         .update({ is_complete: true, status: "completed" })
         .eq("id", roundId);
 
-      if (roundError) throw new Error(roundError.message);
+      // 4. Clear localStorage now that DB is updated
+      clearStorage(roundId);
 
-      setSynced(true);
-
-      // Check for bag tag resolution
+      // 5. Check for bag tag resolution
       const playerIds = players.map((p) => p.id);
       const { data: tagData } = await (supabase as any)
         .from("bag_tags")
@@ -327,35 +306,30 @@ export function CasualScorecardEntry({
       if (tagData && tagData.length >= 2) {
         const holders = tagData.map((tag: any) => {
           const player = players.find((p) => p.id === tag.holder_id)!;
-          const total = getRunningTotal(player.id);
           return {
             playerId: player.id,
             playerName: player.name,
             tagId: tag.id,
             tagNumber: tag.tag_number,
-            score: total,
+            score: getRunningTotal(player.id),
             playoffScore: null,
           };
         });
         setTagHolders(holders);
         setShowTagResolution(true);
       } else {
-        // Clear localStorage only after successful sync
-        clearStorage(roundId);
         setIsComplete(true);
       }
-    } catch (err: any) {
-      setFinishError(err.message ?? "Failed to save scores. Please try again.");
-      setFinishing(false);
+    } catch (err) {
+      setFinishError("Something went wrong. Please try again.");
     }
+
+    setFinishing(false);
   }
 
   const allScored = players.every((p) =>
     holes.every((h) => scores[p.id]?.[h.id] != null),
   );
-  const scoredCount = holes.filter((h) =>
-    players.every((p) => scores[p.id]?.[h.id] != null),
-  ).length;
 
   // ── Completed summary ──
   if (isComplete) {
@@ -375,7 +349,6 @@ export function CasualScorecardEntry({
                 month: "long",
                 year: "numeric",
               })}
-              {startingHole > 1 && ` · Started hole ${startingHole}`}
             </p>
           </div>
           <div
@@ -423,7 +396,6 @@ export function CasualScorecardEntry({
               roundType="casual"
               tagHolders={tagHolders}
               onDismiss={() => {
-                clearStorage(roundId);
                 setShowTagResolution(false);
                 setIsComplete(true);
               }}
@@ -457,11 +429,6 @@ export function CasualScorecardEntry({
             className={`flex items-center gap-1 justify-center text-xs ${t.accent}`}
           >
             <MapPin size={11} /> {courseName}
-            {startingHole > 1 && (
-              <span className="ml-1 text-orange-400">
-                · From hole {startingHole}
-              </span>
-            )}
           </div>
           <div
             className={`flex items-center gap-1 justify-center text-xs mt-0.5 ${t.textSub}`}
@@ -474,15 +441,6 @@ export function CasualScorecardEntry({
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {/* Local save indicator */}
-          <div
-            className={`flex items-center gap-1 text-xs px-2 py-1 rounded-full ${dark ? "bg-white/10" : "bg-gray-100"}`}
-          >
-            <HardDrive size={10} className="text-green-400" />
-            <span className="text-green-400 font-medium">
-              {scoredCount}/{holes.length}
-            </span>
-          </div>
           <ManageRound
             roundId={roundId}
             members={allMembers}
@@ -498,9 +456,17 @@ export function CasualScorecardEntry({
         </div>
       </div>
 
+      {/* Local-save indicator */}
+      <div
+        className={`flex items-center justify-center gap-1.5 py-1 text-xs ${t.textMuted}`}
+      >
+        <WifiOff size={10} />
+        <span>Scores saved locally · syncs on finish</span>
+      </div>
+
       {/* Hole header */}
       <div
-        className={`mx-4 mt-3 rounded-2xl p-4 ${t.card} border ${t.cardBorder}`}
+        className={`mx-4 mt-2 rounded-2xl p-4 ${t.card} border ${t.cardBorder}`}
       >
         <div className="flex items-center justify-between">
           <h2 className={`text-2xl font-black ${t.accent}`}>
@@ -615,9 +581,7 @@ export function CasualScorecardEntry({
         ) : (
           <div className="flex flex-col items-end gap-1">
             {finishError && (
-              <p className="text-xs text-red-400 text-right max-w-[200px]">
-                {finishError}
-              </p>
+              <p className="text-red-400 text-xs">{finishError}</p>
             )}
             <button
               onClick={finishRound}
@@ -729,10 +693,17 @@ export function CasualScorecardEntry({
                 Keep Scoring
               </button>
               <button
-                onClick={() => router.push("/dashboard")}
-                className="flex-1 py-3 rounded-xl bg-orange-500 hover:bg-orange-600 font-semibold text-sm text-white transition-colors"
+                onClick={async () => {
+                  await (supabase as any)
+                    .from("casual_rounds")
+                    .update({ status: "cancelled" })
+                    .eq("id", roundId);
+                  clearStorage(roundId);
+                  router.push("/dashboard");
+                }}
+                className="flex-1 py-3 rounded-xl bg-red-500 hover:bg-red-600 font-semibold text-sm text-white transition-colors"
               >
-                Save & Exit
+                Cancel Round
               </button>
             </div>
           </div>
