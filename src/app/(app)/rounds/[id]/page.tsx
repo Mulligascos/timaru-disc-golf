@@ -30,38 +30,40 @@ export default async function CasualRoundPage({
   const roundData = round as any;
 
   // ── Build hole list ──
-  // If a layout is selected, use layout_holes (which may repeat or reorder holes)
-  // Otherwise fall back to course holes ordered by hole_number
   let scoringHoles: {
-    id: string;
-    hole_number: number;
+    id: string; // unique key for state (layout_hole_id for layouts, hole_id for plain)
+    source_hole_id: string; // real holes.id UUID
+    layout_hole_id: string | null; // layout_holes.id UUID (null for non-layout rounds)
+    hole_number: number; // position in this round (1, 2, 3... wraps for starting hole)
+    display_hole_number: number; // the actual hole label shown on scorecard
     par: number;
     distance_m: number | null;
-    source_hole_id: string;
   }[] = [];
 
   if (roundData.layout_id) {
-    // Fetch layout holes with their source hole data
+    // Layout round — fetch layout holes ordered by position
     const { data: layoutHoles } = await supabase
       .from("layout_holes")
       .select(
-        "hole_number, par_override, distance_override_m, source_hole:holes!layout_holes_source_hole_id_fkey(id, hole_number, par, distance_m)",
+        "id, hole_number, par_override, distance_override_m, source_hole:holes!layout_holes_source_hole_id_fkey(id, hole_number, par, distance_m)",
       )
       .eq("layout_id", roundData.layout_id)
       .order("hole_number", { ascending: true });
 
     if (layoutHoles && layoutHoles.length > 0) {
-      scoringHoles = (layoutHoles as any[]).map((lh: any) => ({
-        id: `${lh.source_hole.id}_${lh.hole_number}`, // unique key for React/scoring state
-        source_hole_id: lh.source_hole.id, // ← add this — real UUID for DB saves
-        hole_number: lh.hole_number,
+      scoringHoles = (layoutHoles as any[]).map((lh: any, idx: number) => ({
+        id: lh.id, // layout_holes.id is the unique key
+        source_hole_id: lh.source_hole.id,
+        layout_hole_id: lh.id,
+        hole_number: idx + 1, // position in round
+        display_hole_number: lh.hole_number, // layout position number
         par: lh.par_override ?? lh.source_hole.par,
         distance_m: lh.distance_override_m ?? lh.source_hole.distance_m,
       }));
     }
   }
 
-  // Fall back to course holes if no layout or layout has no holes
+  // Fall back to course holes
   if (scoringHoles.length === 0) {
     const { data: courseHoles } = await supabase
       .from("holes")
@@ -83,22 +85,33 @@ export default async function CasualRoundPage({
       );
     }
 
-    // Apply starting hole offset for non-layout rounds
+    // Apply starting hole wrap-around
+    // e.g. start at hole 6 on 18-hole course: 6,7,8...18,1,2,3,4,5
     const startingHole = roundData.starting_hole ?? 1;
     const startIdx = (courseHoles as any[]).findIndex(
       (h: any) => h.hole_number === startingHole,
     );
-    scoringHoles =
+    const orderedHoles =
       startIdx > 0
         ? [...courseHoles.slice(startIdx), ...courseHoles.slice(0, startIdx)]
         : (courseHoles as any[]);
+
+    scoringHoles = orderedHoles.map((h: any, idx: number) => ({
+      id: h.id,
+      source_hole_id: h.id,
+      layout_hole_id: null,
+      hole_number: idx + 1, // scoring position (1 = first hole played)
+      display_hole_number: h.hole_number, // actual hole number on course
+      par: h.par,
+      distance_m: h.distance_m,
+    }));
   }
 
   // ── Build player list ──
   const { data: scorecards } = await supabase
     .from("scorecards")
     .select(
-      "id, player_id, scores(throws, hole_id), profiles(id, full_name, username, nickname, division)",
+      "id, player_id, scores(throws, hole_id, layout_hole_id), profiles(id, full_name, username, nickname, division)",
     )
     .eq("casual_round_id", roundData.id);
 
@@ -116,15 +129,17 @@ export default async function CasualRoundPage({
   const players = (scorecards as any[]).map((sc: any) => {
     const profile = sc.profiles as any;
     const existingScores: Record<string, number> = {};
+
     for (const s of sc.scores ?? []) {
-      // Find which layout position this hole maps to
-      const layoutHole = scoringHoles.find(
-        (h: any) => (h.source_hole_id ?? h.id) === s.hole_id,
-      );
-      if (layoutHole) {
-        existingScores[layoutHole.id] = s.throws; // key by composite ID
+      if (s.layout_hole_id) {
+        // Layout round — key by layout_hole_id
+        existingScores[s.layout_hole_id] = s.throws;
+      } else if (s.hole_id) {
+        // Non-layout round — key by hole_id
+        existingScores[s.hole_id] = s.throws;
       }
     }
+
     return {
       id: sc.player_id,
       name:
@@ -144,6 +159,7 @@ export default async function CasualRoundPage({
     .eq("is_active", true);
 
   const currentPlayerIds = (scorecards as any[]).map((sc: any) => sc.player_id);
+
   let layoutName: string | null = null;
   if (roundData.layout_id) {
     const { data: layoutData } = await supabase
@@ -153,6 +169,9 @@ export default async function CasualRoundPage({
       .single();
     layoutName = (layoutData as any)?.name ?? null;
   }
+
+  const startingHole = roundData.starting_hole ?? 1;
+
   return (
     <CasualScorecardEntry
       players={players}
@@ -166,9 +185,10 @@ export default async function CasualRoundPage({
       }
       notes={roundData.notes}
       isComplete={roundData.is_complete}
-      startingHole={roundData.starting_hole ?? 1}
+      startingHole={startingHole}
       allMembers={allMembers ?? []}
       currentPlayerIds={currentPlayerIds}
+      isLayoutRound={!!roundData.layout_id}
     />
   );
 }
